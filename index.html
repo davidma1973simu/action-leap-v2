@@ -145,6 +145,32 @@
   .soon h2{margin:0 0 8px;color:var(--ink);font-size:19px;font-weight:700}
   .soon p{margin:0;max-width:420px;font-size:13.5px;line-height:1.7}
 
+  /* ---------- 如何使用（引导页） ---------- */
+  .guide-sec{margin-bottom:36px}
+  .guide-sec .gh{display:flex;align-items:center;gap:10px;margin:0 0 16px}
+  .guide-sec .gh .ey{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--primary-600);background:var(--primary-soft);padding:4px 11px;border-radius:999px}
+  .guide-sec .gh h2{margin:0;font-size:19px;font-weight:700}
+  .flow4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  .flow4 .fc{position:relative;padding:18px 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;text-align:center;box-shadow:var(--shadow-sm)}
+  .flow4 .fc .role{font-size:11.5px;color:var(--ink-3);font-weight:700;letter-spacing:.3px}
+  .flow4 .fc .act{font-size:14px;font-weight:700;margin-top:8px;color:var(--ink)}
+  .flow4 .fc .sub{font-size:11.5px;color:var(--ink-2);margin-top:6px;line-height:1.55}
+  .flow4 .fc:not(:last-child)::after{content:"";position:absolute;right:-12px;top:50%;transform:translateY(-50%) rotate(45deg);width:8px;height:8px;border-top:2px solid var(--brand-line);border-right:2px solid var(--brand-line);z-index:2}
+  .guide-note{font-size:12.5px;color:var(--ink-3);margin:14px 2px 0;line-height:1.7}
+  .steps{display:flex;flex-direction:column}
+  .step{display:flex;gap:16px;padding:16px 4px;border-top:1px dashed var(--line-2)}
+  .step:first-child{border-top:0}
+  .step .num{width:34px;height:34px;flex:0 0 34px;border-radius:11px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:var(--shadow-sm)}
+  .step .body{flex:1;min-width:0}
+  .step .q{font-size:15px;font-weight:700;line-height:1.5}
+  .step .a{font-size:13px;color:var(--ink-2);margin-top:4px;line-height:1.65}
+  .step .ai{display:inline-block;margin-top:8px;font-size:11.5px;color:var(--primary-600);background:var(--primary-soft);padding:3px 10px;border-radius:8px;font-weight:600}
+  .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .rule{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:15px 17px}
+  .rule .t{font-size:14px;font-weight:700;color:var(--ink)}
+  .rule .d{font-size:12.5px;color:var(--ink-2);margin-top:6px;line-height:1.65}
+  @media(max-width:760px){.flow4{grid-template-columns:1fr 1fr;gap:12px}.flow4 .fc:not(:last-child)::after{display:none}}
+
   /* ---------- 学员端（P2 行为改变引擎） ---------- */
   .student-bar{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;
     margin-bottom:16px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:13px}
@@ -685,6 +711,10 @@
       </div>
     </div>
     <nav class="nav">
+      <div class="nav-item" data-tab="guide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5C7 4.5 4 5.6 4 7v10c0 1.4 3 2.5 8 2.5s8-1.1 8-2.5V7c0-1.4-3-2.5-8-2.5z"/><path d="M4 7c0 1.4 3 2.5 8 2.5s8-1.1 8-2.5"/><path d="M4 12c0 1.4 3 2.5 8 2.5s8-1.1 8-2.5"/></svg>
+        如何使用
+      </div>
       <div class="nav-item active" data-tab="config">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="9" cy="7" r="2.4" fill="currentColor" stroke="none"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="15" cy="17" r="2.4" fill="currentColor" stroke="none"/></svg>
         课程配置
@@ -708,6 +738,53 @@
   <!-- 主区 -->
   <div class="main">
     <div class="content">
+      <!-- 如何使用 -->
+      <section id="tab-guide" class="tab hidden">
+        <div class="page-head">
+          <div>
+            <h1>如何使用 Action Leap</h1>
+            <p>四步看懂产品怎么转：配置者怎么填、学员怎么用、HR 怎么拿到成果。新手先看这一页，再进配置构建器。</p>
+          </div>
+        </div>
+
+        <!-- 全链路运转 -->
+        <div class="guide-sec">
+          <div class="gh"><span class="ey">运转逻辑</span><h2>一条线跑通四角色</h2></div>
+          <div class="flow4">
+            <div class="fc"><div class="role">① 配置者 / 讲师</div><div class="act">填场景·任务·方法</div><div class="sub">或让 AI 一键起草，确认后发布</div></div>
+            <div class="fc"><div class="role">② 学员（手机）</div><div class="act">两周微打卡</div><div class="sub">每天 1–2 个，AI 即时陪练</div></div>
+            <div class="fc"><div class="role">③ 系统</div><div class="act">自动聚合</div><div class="sub">打卡 → 复盘数据自动汇总</div></div>
+            <div class="fc"><div class="role">④ HR / 管理者</div><div class="act">看成果汇报</div><div class="sub">复盘评分 + 一页证据链</div></div>
+          </div>
+          <p class="guide-note">学员端极简（≈30 秒微打卡，嵌入微信/手机，免登录）；重活交给系统与 AI；HR 拿到汇报就绪的一页视图。</p>
+        </div>
+
+        <!-- 七步填报 -->
+        <div class="guide-sec">
+          <div class="gh"><span class="ey">配置者指引</span><h2>七步填完一门课</h2></div>
+          <div class="steps">
+            <div class="step"><div class="num">1</div><div class="body"><div class="q">这门课服务谁？什么班次、什么主题？</div><div class="a">填客户、班次、课程主题，生成课程外壳。</div></div></div>
+            <div class="step"><div class="num">2</div><div class="body"><div class="q">学员回到工作后，最常在哪几个真实场景"卡住"？</div><div class="a">写 1–3 个场景与挑战（大白话），长出场景卡。</div><span class="ai">AI 可起草</span></div></div>
+            <div class="step"><div class="num">3</div><div class="body"><div class="q">每个场景里，学员具体要做哪几件小事？</div><div class="a">拆成微行动任务，一个任务 = 一次微打卡。</div><span class="ai">AI 可起草</span></div></div>
+            <div class="step"><div class="num">4</div><div class="body"><div class="q">做这些事用什么方法工具？要练成什么高绩效行为？</div><div class="a">给每个任务挂方法工具 + 行为描述。</div><span class="ai">AI 可起草</span></div></div>
+            <div class="step"><div class="num">5</div><div class="body"><div class="q">这个场景要改善哪个业务指标？（可选）</div><div class="a">填一个指标与目标，用于成果汇报。</div><span class="ai">AI 可起草</span></div></div>
+            <div class="step"><div class="num">6</div><div class="body"><div class="q">节奏怎么排？工作日、每天上限、开始日？</div><div class="a">默认 10 个工作日 × 每天最多 2 个 = 上限 20 次，可改。</div></div></div>
+            <div class="step"><div class="num">7</div><div class="body"><div class="q">确认无误？</div><div class="a">预览后生成学员端分享链接，发给学员即可。</div></div></div>
+          </div>
+        </div>
+
+        <!-- 关键规则 -->
+        <div class="guide-sec">
+          <div class="gh"><span class="ey">组织者须知</span><h2>四个关键规则</h2></div>
+          <div class="rules">
+            <div class="rule"><div class="t">上限 20 次</div><div class="d">10 个工作日 × 每天最多 2 个任务。这是天花板不是配额，通常 5–6 个任务即够。</div></div>
+            <div class="rule"><div class="t">按工作日</div><div class="d">自动跳过周末；学员漏打不惩罚，任务顺延到下一个工作日。</div></div>
+            <div class="rule"><div class="t">统一开始日</div><div class="d">默认全班统一（培训后下一个工作日）；晚打开的学员从当天自动补位。</div></div>
+            <div class="rule"><div class="t">示范样例</div><div class="d">内置不可删的"松下电机沙盘课"，配置任意一步都可「看样例」对照。</div></div>
+          </div>
+        </div>
+      </section>
+
       <!-- 课程配置 -->
       <section id="tab-config" class="tab">
         <!-- 列表视图（P0） -->
@@ -995,8 +1072,9 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=7"></script>
+<script src="v2-core.js?v=8"></script>
 <script src="icons.js"></script>
+<script src="ai.js"></script>
 <script>
   // =====================================================================
   //  公共工具
