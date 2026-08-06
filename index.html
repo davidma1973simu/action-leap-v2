@@ -122,6 +122,10 @@
   .course-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;
                box-shadow:var(--shadow-sm);transition:.18s;display:flex;flex-direction:column;gap:12px}
   .course-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:#dde2ec}
+  .course-card.sample{border-color:var(--brand-line);background:linear-gradient(180deg,var(--brand-50),#fff 60%)}
+  .badge-sample{font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;color:#fff;
+                background:var(--brand);box-shadow:var(--sh-brand);display:inline-flex;align-items:center;gap:5px}
+  .badge-sample::before{content:"";width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.85)}
   .cc-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .cc-id{font-size:12px;color:var(--ink-3);font-weight:600;letter-spacing:.2px}
   .cc-title{font-size:17px;font-weight:700;line-height:1.35;cursor:pointer}
@@ -940,7 +944,7 @@
             <div class="head-actions">
               <button class="btn btn-ghost" id="btn-sample">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
-                载入示例课程
+                看示范样例
               </button>
               <button class="btn btn-ghost" id="btn-import">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
@@ -1216,6 +1220,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="v2-core.js?v=8"></script>
+<script src="sample-data.js"></script>
 <script src="icons.js"></script>
 <script src="ai.js"></script>
 <script src="wizard.js"></script>
@@ -1320,19 +1325,22 @@
       if (!c) return;
       var st = c.consensus && c.consensus.status === 'live' ? 'live' : (c.consensus && c.consensus.status === 'consensus' ? 'consensus' : 'draft');
       var stText = st === 'live' ? '已发布' : (st === 'consensus' ? '已共识' : '草稿');
+      var isSample = c.sample && c.sample.isSample;
       var scCount = (c.scenarios||[]).length;
       var card = document.createElement('div');
-      card.className = 'course-card';
+      card.className = 'course-card' + (isSample ? ' sample' : '');
       card.innerHTML =
         '<div class="cc-top"><span class="cc-id">' + esc(c.client) + ' · ' + esc(c.cohort) + '</span>' +
-        '<span class="status ' + st + '">' + stText + '</span></div>' +
+        (isSample ? '<span class="badge-sample">示范</span>' : '<span class="status ' + st + '">' + stText + '</span>') + '</div>' +
         '<div class="cc-title" data-sku="' + esc(sku) + '">' + esc(c.theme) + '</div>' +
         '<div class="cc-meta">客户：' + esc(c.client) + ' ｜ 班次：' + esc(c.cohort) + '</div>' +
         '<div class="cc-actions">' +
           '<button class="btn btn-ghost btn-sm" data-act="open" data-sku="' + esc(sku) + '">查看</button>' +
           '<button class="btn btn-ghost btn-sm" data-act="build" data-sku="' + esc(sku) + '">配置构建器</button>' +
-          '<button class="btn btn-ghost btn-sm" data-act="export" data-sku="' + esc(sku) + '">导出配置包</button>' +
-          '<button class="btn btn-danger btn-sm" data-act="del" data-sku="' + esc(sku) + '">删除</button>' +
+          (isSample
+            ? '<button class="btn btn-primary btn-sm" data-act="clone" data-sku="' + esc(sku) + '">复制为我的课程</button>'
+            : '<button class="btn btn-ghost btn-sm" data-act="export" data-sku="' + esc(sku) + '">导出配置包</button>' +
+              '<button class="btn btn-danger btn-sm" data-act="del" data-sku="' + esc(sku) + '">删除</button>') +
         '</div>';
       grid.appendChild(card);
     });
@@ -1349,11 +1357,13 @@
         if (!c) return;
         if (act === 'open') openDrawer(c);
         else if (act === 'build') openBuilder(sku);
+        else if (act === 'clone') cloneSample(sku);
         else if (act === 'export') {
           var fn = (c.theme || 'course') + (c.cohort ? '-' + c.cohort : '') + '.json';
           download(fn, ALV2.pkg.export(c));
           toast('已导出配置文件', 'ok');
         } else if (act === 'del') {
+          if (c.sample && c.sample.locked) { toast('示范课程不可删除，可「复制为我的课程」后编辑', 'err'); return; }
           if (confirm('确定删除「' + c.theme + '」？该课程的所有数据将一并清除。')) {
             ALV2.store.del(sku);
             renderCourses();
@@ -2040,110 +2050,101 @@
   //  载入示例课程（松下电机 · 战略执行沙盘）—— v3 完全嵌套结构
   // =====================================================================
   function seedSample() {
-    try {
-      if (!window.ALV2) { toast('系统脚本未加载，请刷新页面（Ctrl/Cmd+Shift+R）', 'err'); return; }
-      var sku = ALV2.SKU.make('松下电机 中国公司', '中层管理者后备经理', 'v1');
-      var exist = ALV2.store.get(sku, 'config', null);
-      if (exist) { openBuilder(sku); toast('已打开示例课程', 'ok'); return; }
-      var c = ALV2.createBlank({
-        client: '松下电机 中国公司', cohort: '中层管理者后备经理', theme: '战略执行和全局经营沙盘模拟',
-        needs: '建立商业全局观，清晰组织战略构建与价值创造过程，做出高质量商业决策，跨部门协同构建执行方案并建立评价体系优化迭代。财务与经营业务分析。最终承担更大商业结果性目标的能力。'
-      });
-
-      // --- 场景闭环（所有内容嵌套在此）---
-      var sid = ALV2.uid('scene');
-      var tid = ALV2.uid('task');
-
-      // 方法工具（嵌入任务内）
-      var method1 = {
-        id: ALV2.uid('method'),
-        name: '战略规划的全局流程',
-        desc: '将战略从洞察到执行落地的端到端方法，贯穿六环节。',
-        steps: ['准备事实 / 假设 / 未知三类信息', '制定三年量化战略目标', '将目标落实到职能·任务·产出·资源·责任人', '规划未来三年现金流与销售目标', '跨部门协同确认关键人物与依赖', '建立过程性评估指标'],
-        output: '一份可执行的战略规划与执行计划书'
-      };
-
-      // 高绩效行为（嵌入任务内）
-      var behList = [
-        { id: ALV2.uid('behavior'), desc: '能够准备相关的事实信息、假设和未知三类信息',
-          signal: '会议前能清晰区分「已知事实 / 假设 / 未知」',
-          tinyHabit: '每次决策前先列出三类信息清单', promptWhen: '年度规划会议前', promptWhere: '会议准备区',
-          identity: '你正在成为用事实说话的经营者' },
-        { id: ALV2.uid('behavior'), desc: '能够制定量化的三年期战略目标',
-          signal: '战略目标含明确数字与时间节点',
-          tinyHabit: '为每条战略写下至少一个三年数字', promptWhen: '战略工作坊', promptWhere: '会议室',
-          identity: '你正在成为能定义未来的经营者' },
-        { id: ALV2.uid('behavior'), desc: '能够将战略目标落实到职能、任务、产出、资源和责任人',
-          signal: '每个目标都有对应职能与明确责任人',
-          tinyHabit: '给每个战略目标配一张拆解表', promptWhere: '办公桌',
-          identity: '你正在成为让战略落地的管理者' },
-        { id: ALV2.uid('behavior'), desc: '能够规划出来未来三年的现金流和销售目标',
-          signal: '有三年现金流与销售测算表',
-          tinyHabit: '每季度更新一次现金流预测', promptWhen: '财务对齐会', promptWhere: '财务部',
-          identity: '你正在成为懂财务的经营一把手' },
-        { id: ALV2.uid('behavior'), desc: '能够和其他部门协同确认关键人物',
-          signal: '跨部门依赖已确认到具体责任人',
-          tinyHabit: '每周与一个协同部门对齐一次', promptWhen: '周协同会', promptWhere: '协同部门',
-          identity: '你正在成为被信赖的协同伙伴' },
-        { id: ALV2.uid('behavior'), desc: '能够建立起来过程性的评估指标',
-          signal: '关键任务设有领先指标（而非只看结果）',
-          tinyHabit: '为一项关键任务设一个领先指标', promptWhen: '月度经营会', promptWhere: '会议室',
-          identity: '你正在成为用数据管理的经营者' }
-      ];
-
-      // 绩效指标（挂在场景级）
-      var metric1 = {
-        name: '战略执行计划完成度',
-        baseline: '无（首期试点）',
-        target: '100% 完成战略目标的六步拆解与执行计划书',
-        desc: '衡量学员能否独立产出可落地的战略与执行方案。'
-      };
-
-      c.scenarios.push({
-        id: sid,
-        name: '年度业务规划与关键任务会议',
-        challenge: '各部门各说各话、目标与资源脱节，战略难以落地。',
-        desc: '每年对齐战略方向、拆解关键任务、确认跨部门协同节点与责任人。',
-        tasks: [{
-          id: tid,
-          name: '按流程和步骤完成战略规划的全局内容',
-          desc: '遵循「战略规划的全局流程」六步，产出本业务单元的战略规划与执行计划书。',
-          benefit: '你的方案将直接进入年度规划评审，是被高层看见的关键机会。',
-          methods: [method1],
-          behaviors: behList
-        }],
-        metric: metric1
-      });
-
-      // --- 培训价值证据链（大白话预填）---
-      c.evidenceChain = {
-        spentWhat: '战略执行和全局经营沙盘模拟（2天高强度沙盘演练），覆盖战略从制定到拆解到财务规划到跨部门协同的全流程。',
-        changedWhat: '6 个高绩效行为被学员在实际工作中采用——从"拍脑袋定战略"变为用事实信息支撑判断、从"各自为政"变为主动跨部门确认依赖关系。',
-        producedWhat: '年度规划会议产出了完整的、可执行的战略规划与执行计划书（含三年现金流、跨部门责任人、过程评估指标），不再是空泛的方向性口号。',
-        earnedWhat: '这批后备经理具备了承担更大商业结果性目标的能力——他们不再只是"听懂了战略"，而是能独立带领团队完成从战略到执行的全链条工作。',
-        links: [
-          '沙盘模拟在低风险环境中让学员反复演练战略制定的完整流程，肌肉记忆形成后自然迁移到真实工作场景。',
-          '6 个高绩效行为直接对应规划会议中的关键动作（准备信息→设定目标→拆解落实→财务规划→协同确认→过程评估），每一步都有明确的场景触发点和微习惯设计。',
-          '当所有行为在会议中被系统性地执行，产出的自然是一份可落地的战略方案——这不是额外的工作量，而是更高效的做事方式。'
-        ],
-        expectedEvidence: [
-          '学员完成沙盘模拟训练并产出练习方案（课堂产物）',
-          '6 个行为在年度规划会议中被实际采用（观察记录 / 自评打卡）',
-          '会议产出可执行的战略规划与执行计划书（文档证据）',
-          '学员未来能独立承担更大商业结果性目标（后续晋升 / 项目任命等客观事实）'
-        ]
-      };
-
-      ALV2.store.set(sku, 'config', c);
-      renderCourses();
-      openBuilder(sku);
-      toast('已载入示例课程（松下电机 · 战略执行沙盘）', 'ok');
-    } catch (e) {
-      toast('示例载入失败：' + (e && e.message ? e.message : e), 'err');
-      console.error(e);
-    }
+    var sku = ALV2_SAMPLE.SAMPLE_SKU;
+    if (ALV2.store.get(sku, 'config', null)) { openBuilder(sku); toast('已打开示范课程', 'ok'); return; }
+    injectSample();
+    openBuilder(sku);
+    toast('已载入示范课程（松下电机 · 战略执行沙盘）', 'ok');
   }
-  document.getElementById('btn-sample').onclick = seedSample;
+
+  /* 不可删示范样例：全链路注入（配置 + 5 虚拟学员 + 两周打卡） */
+  function injectSample() {
+    var sku = ALV2_SAMPLE.SAMPLE_SKU;
+    if (ALV2.store.get(sku, 'config', null)) return;
+    var c = ALV2_SAMPLE.build();
+    ALV2.store.set(sku, 'config', c);
+    var sts = ALV2_SAMPLE.students();
+    ALV2.store.set(sku, 'students', sts);
+    var cis = genSampleCheckins(c, sts);
+    Object.keys(cis).forEach(function (sid) { ALV2.store.set(sku, 'checkins:' + sid, cis[sid]); });
+  }
+  function autoSeedSample() {
+    try { injectSample(); } catch (e) { console.error('示范课自动注入失败', e); }
+    renderCourses();
+  }
+
+  /* 生成多学员两周打卡：坚持 / 起伏 / 中断 / 慢热 / 旁观 五种画像 */
+  function genSampleCheckins(course, students) {
+    var sched = ALV2.schedulePlan(course);
+    var behIds = [];
+    (course.scenarios[0].tasks[0].behaviors).forEach(function (b) { behIds.push(b.id); });
+    var taskId = course.scenarios[0].tasks[0].id, sceneId = course.scenarios[0].id;
+    var profiles = { s_a: 'persist', s_b: 'wave', s_c: 'drop', s_d: 'late', s_e: 'idle' };
+    var out = {};
+    students.forEach(function (st) {
+      out[st.id] = [];
+      var prof = profiles[st.id] || 'idle';
+      sched.days.forEach(function (d, di) {
+        if (di > 4) return; // 只填充已过去的日子，制造"进行中"的真实感
+        behIds.forEach(function (bid, bi) {
+          var stt = decideStatus(prof, di, bi, behIds.length);
+          if (!stt) return;
+          var dt = new Date(d.date); dt.setHours(9 + (bi % 6), 8 * (bi % 5), 0, 0);
+          out[st.id].push({
+            id: ALV2.uid('ck'), behaviorId: bid, sceneId: sceneId, taskId: taskId,
+            status: stt, note: '', identitySignal: false, ts: dt.getTime()
+          });
+        });
+      });
+    });
+    return out;
+  }
+  function decideStatus(prof, di, bi, n) {
+    if (prof === 'persist') return di <= 4 ? 'persisting' : null;
+    if (prof === 'wave') return di % 2 === 0 ? 'persisting' : (bi % 2 ? 'dropped' : 'persisting');
+    if (prof === 'drop') return di <= 2 ? 'persisting' : 'dropped';
+    if (prof === 'late') return di < 2 ? null : 'persisting';
+    if (prof === 'idle') return di === 0 && bi === 0 ? 'tried' : null;
+    return null;
+  }
+
+  /* 复制示范课为可编辑副本 */
+  function cloneSample(sku) {
+    var c = ALV2.store.get(sku, 'config', null);
+    if (!c) { toast('示范课不存在', 'err'); return; }
+    var copy = JSON.parse(JSON.stringify(c));
+    copy.sample = { isSample: false, locked: false, cloneFrom: sku };
+    copy.consensus = { status: 'draft', approver: '', approvedAt: '' };
+    copy.aiConfig = { provider: 'openai-compatible', baseURL: 'https://api.openai.com/v1', apiKey: '', model: 'gpt-4o-mini' };
+    var base = ALV2.SKU.make(c.client, c.cohort + ' 副本', 'v1');
+    var nsku = base, i = 1;
+    while (ALV2.store.get(nsku, 'config', null)) { nsku = base + '_' + (++i); }
+    copy.sku = nsku;
+    ALV2.store.set(nsku, 'config', copy);
+    renderCourses();
+    toast('已复制为「' + c.theme + ' 副本」，可自由编辑', 'ok');
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.nav-item').forEach(function (x) { x.classList.remove('active'); });
+    document.querySelectorAll('.tab').forEach(function (x) { x.classList.add('hidden'); });
+    var nav = document.querySelector('.nav-item[data-tab="' + name + '"]');
+    if (nav) nav.classList.add('active');
+    var tab = document.getElementById('tab-' + name);
+    if (tab) tab.classList.remove('hidden');
+    if (name === 'student') renderStudentEntry();
+    if (name === 'review') RV.render();
+    if (name === 'report') renderReport();
+  }
+
+  /* 向导"看样例"：跳到示范课构建器 */
+  window.ALV2_viewSample = function () {
+    injectSample();
+    switchTab('config');
+    openBuilder(ALV2_SAMPLE.SAMPLE_SKU);
+  };
+
+  document.getElementById('btn-sample').onclick = function () { seedSample(); };
 
   // =====================================================================
   //  P2（改）：学员端（手机）入口页
@@ -2952,8 +2953,8 @@
     area.querySelector('.rv-fb-textarea').value = fb;
     toast('已生成 AI 建议评分与评语，请确认后点「保存评分」', 'ok');
   }
-  // 初始化
-  renderCourses();
+  // 初始化（自动注入不可删示范样例，再渲染课程列表）
+  autoSeedSample();
 </script>
 <div id="wizard" class="wizard-overlay hidden"></div>
 <div id="wz-ai" class="wz-ai"></div>
