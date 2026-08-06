@@ -51,7 +51,7 @@
   --sh-sm:  0 2px 8px rgba(26,34,51,.05), 0 8px 20px rgba(26,34,51,.07);
   --sh-md:  0 4px 14px rgba(26,34,51,.07), 0 18px 40px rgba(26,34,51,.10);
   --sh-lg:  0 8px 24px rgba(26,34,51,.10), 0 30px 70px rgba(26,34,51,.14);
-  --sh-brand: 0 6px 18px var(--brand-glow), 0 14px 40px rgba(79,70,229,.16);
+  --sh-brand: 0 10px 30px rgba(79,70,229,.10), 0 3px 8px rgba(79,70,229,.06);
 
   /* ---- 排版 9-step ---- */
   --fs-2xs: 11px; --fs-xs: 12px; --fs-sm: 13px; --fs-base: 14px;
@@ -72,7 +72,7 @@
   --max-w-xl: 1120px; --max-w-2xl: 1320px;
 
   /* ---- 字体族（中英双语，瑞士质感）---- */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+  --font-sans: "Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Text",
                "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
   --font-serif: "Songti SC", "Noto Serif SC", Georgia, "Times New Roman", serif;
   --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
