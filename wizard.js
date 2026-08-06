@@ -518,10 +518,11 @@
     var box = el('wz-ai');
     box.innerHTML = '<div class="wz-ai-modal">' +
       '<div class="wz-ai-head"><b>AI 起草 · 关键场景</b><button class="wz-x" id="wz-dg-x">✕</button></div>' +
-      '<p class="wz-ai-note">最少只需三句话。AI 会生成场景、任务、方法、行为与指标，全部标记为草稿，待你逐项确认。</p>' +
+      '<p class="wz-ai-note">最少只需三句话。也可附上课程资料（txt / md），AI 会据此生成场景、任务、方法、行为与指标，全部标记为草稿待你确认。</p>' +
       '<div class="field"><label>课程主题</label><input class="in" id="wz-dg-theme" value="' + esc(state.draft.theme) + '" placeholder="如：战略执行与全局经营沙盘" /></div>' +
       '<div class="field"><label>学员岗位</label><input class="in" id="wz-dg-role" value="' + esc(state.draft.cohort ? state.draft.cohort + ' 学员' : '') + '" placeholder="如：新任中层管理者" /></div>' +
       '<div class="field"><label>想解决的 business 问题</label><textarea class="in" id="wz-dg-needs" rows="3" placeholder="如：跨部门协同低效、决策质量不稳定">' + esc(state.draft.needs) + '</textarea></div>' +
+      '<div class="field"><label>课程资料（可选 · txt / md）</label><input type="file" id="wz-dg-file" accept=".txt,.md,.json" /></div>' +
       '<div class="wz-ai-foot"><button class="btn btn-ghost btn-sm" id="wz-dg-cancel">取消</button>' +
       '<button class="btn btn-primary btn-sm" id="wz-dg-go">生成草稿</button></div>' +
       '<div class="wz-dg-status" id="wz-dg-status"></div>' +
@@ -533,25 +534,33 @@
       var input = {
         theme: el('wz-dg-theme').value.trim(),
         role: el('wz-dg-role').value.trim(),
-        needs: el('wz-dg-needs').value.trim()
+        needs: el('wz-dg-needs').value.trim(),
+        files: []
       };
       var st = el('wz-dg-status');
-      st.textContent = '正在生成…（约 10–30 秒）';
-      el('wz-dg-go').disabled = true;
-      ai.generateConfigDraft(input, state.draft.aiConfig).then(function (mapped) {
-        // 合并到草稿：场景追加，证据链覆盖
-        (mapped.scenarios || []).forEach(function (sc) { state.draft.scenarios.push(sc); });
-        if (mapped.evidenceChain) state.draft.evidenceChain = mapped.evidenceChain;
-        // 同步外壳信息（若为空）
-        if (!state.draft.theme && input.theme) state.draft.theme = input.theme;
-        if (!state.draft.needs && input.needs) state.draft.needs = input.needs;
-        closeAi();
-        renderBody();
-        toast('AI 已生成 ' + mapped.scenarios.length + ' 个场景草稿，请逐项确认', 'ok');
-      }).catch(function (err) {
-        st.textContent = '生成失败：' + err.message;
-        el('wz-dg-go').disabled = false;
-      });
+      var run = function () {
+        st.textContent = '正在生成…（约 10–30 秒）';
+        el('wz-dg-go').disabled = true;
+        ai.generateConfigDraft(input, state.draft.aiConfig).then(function (mapped) {
+          (mapped.scenarios || []).forEach(function (sc) { state.draft.scenarios.push(sc); });
+          if (mapped.evidenceChain) state.draft.evidenceChain = mapped.evidenceChain;
+          if (!state.draft.theme && input.theme) state.draft.theme = input.theme;
+          if (!state.draft.needs && input.needs) state.draft.needs = input.needs;
+          closeAi();
+          renderBody();
+          toast('AI 已生成 ' + mapped.scenarios.length + ' 个场景草稿，请逐项确认', 'ok');
+        }).catch(function (err) {
+          st.textContent = '生成失败：' + err.message;
+          el('wz-dg-go').disabled = false;
+        });
+      };
+      var f = el('wz-dg-file') && el('wz-dg-file').files[0];
+      if (f) {
+        var r = new FileReader();
+        r.onload = function () { input.files = [String(r.result || '')]; run(); };
+        r.onerror = function () { st.textContent = '资料读取失败，已忽略继续生成'; run(); };
+        r.readAsText(f);
+      } else { run(); }
     };
   }
   function closeAi() { var box = el('wz-ai'); box.classList.remove('show'); box.innerHTML = ''; }
