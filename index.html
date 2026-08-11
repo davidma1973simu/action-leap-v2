@@ -1981,7 +1981,23 @@
   /* 不可删示范样例：全链路注入（配置 + 5 虚拟学员 + 10 条高绩效行为提交） */
   function injectSample() {
     var sku = ALV2_SAMPLE.SAMPLE_SKU;
-    if (ALV2.store.get(sku, 'config', null)) return;
+    /* schema@5 体检：示范课程必须满足「场景挂有 behaviors[] 且 ≥ 1 条 + methods[]」；
+       旧 schema@4 课程被污染过时不达标 → 强制重置 sample（普通用户课程不受影响） */
+    var old = ALV2.store.get(sku, 'config', null);
+    if (old) {
+      var bad = false;
+      try {
+        var sc = (old.scenarios || [])[0];
+        if (!sc || !Array.isArray(sc.behaviors) || sc.behaviors.length < 8) bad = true;
+        if (!Array.isArray(sc && sc.methods) || sc.methods.length < 1) bad = true;
+      } catch (e) { bad = true; }
+      if (!bad) return;
+      /* 旧示范课已坏：清掉 5 虚拟学员 + 10 提交，再覆盖 config */
+      var sts0 = ALV2.store.get(sku, 'students', null);
+      if (Array.isArray(sts0)) sts0.forEach(function (st) { ALV2.store.remove(sku, 'subs:' + st.id); });
+      ALV2.store.remove(sku, 'students');
+      ALV2.store.remove(sku, 'config');
+    }
     var c = ALV2_SAMPLE.build();
     ALV2.store.set(sku, 'config', c);
     var sts = ALV2_SAMPLE.students();
