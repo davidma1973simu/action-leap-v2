@@ -1219,7 +1219,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=8"></script>
+<script src="v2-core.js?v=9"></script>
 <script src="sample-data.js"></script>
 <script src="icons.js"></script>
 <script src="ai.js"></script>
@@ -1258,34 +1258,41 @@
     document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
-  /* 数据聚合：把分散存储的打卡合并回学员对象，供复盘 / 汇报统一使用 */
+  /* 数据聚合：把分散存储的提交合并回学员对象，供复盘 / 汇报统一使用（schema@5：提交叫 subs） */
   function gatherStudents(sku) {
     var arr = ALV2.store.get(sku, 'students', []) || [];
     return arr.map(function (s) {
-      var ck = ALV2.store.get(sku, 'checkins:' + s.id, []) || [];
-      return { id: s.id, name: s.name, addedAt: s.addedAt || null, checkins: ck, raw: s };
+      var subs = ALV2.store.get(sku, 'subs:' + s.id, []) || [];
+      return { id: s.id, name: s.name, addedAt: s.addedAt || null, subs: subs, raw: s };
     });
   }
-  function gatherAllChecks(sku) {
+  function gatherAllSubs(sku) {
     var out = [];
     gatherStudents(sku).forEach(function (s) {
-      (s.checkins || []).forEach(function (c) {
+      (s.subs || []).forEach(function (c) {
         var x = {}; for (var k in c) x[k] = c[k];
         x.studentId = s.id; x.studentName = s.name; out.push(x);
       });
     });
     return out;
   }
+  /* 扁平化：行为直接挂在场景上（schema@5，去掉 task 中间层）。返回 {b, scene} 形状兼容旧调用点 */
   function flatBehaviors(c) {
     var out = [];
     (c.scenarios || []).forEach(function (sc) {
-      (sc.tasks || []).forEach(function (tk) {
-        (tk.behaviors || []).forEach(function (b) { out.push({ b: b, scene: sc, task: tk }); });
+      (sc.behaviors || []).forEach(function (b) {
+        out.push({
+          b: b, scene: sc,
+          behaviorId: b.id, kind: b.kind || 'micro',
+          scenarioId: sc.id, scenarioTitle: sc.name || sc.title || '',
+          sceneName: sc.name || sc.title || ''
+        });
       });
     });
     return out;
   }
-  function statusOf(s) { return s === 'persisting' ? '在坚持' : (s === 'tried' ? '试了一步' : '先放一放'); }
+  /* 关键行为 vs 微行为 的展示名（学员端统一叫"高绩效行为"，这里配置端区分） */
+  function kindLabel(k) { return k === 'key' ? '关键行为' : '微行为'; }
 
   // =====================================================================
   //  P0：课程列表
@@ -1390,10 +1397,10 @@
     document.getElementById('dr-needs').textContent = c.needs || '—';
     document.getElementById('dr-note').textContent = c.note || '—';
     var scenarios = c.scenarios || [];
-    var taskTotal = 0;
-    scenarios.forEach(function (sc) { taskTotal += (sc.tasks||[]).length; });
+    var behTotal = 0;
+    scenarios.forEach(function (sc) { behTotal += (sc.behaviors||[]).length; });
     document.getElementById('dr-progress').textContent =
-      '场景 ' + scenarios.length + ' · 任务 ' + taskTotal;
+      '场景 ' + scenarios.length + ' · 行为 ' + behTotal;
     drawer.classList.add('show'); drawerOverlay.classList.add('show');
     drawer.dataset.sku = c.sku;
   }
@@ -1496,7 +1503,13 @@
 
   // ---- 渲染单个场景闭环卡片（v3：完全自包含）----
   function renderScenarioCard(sc, idx) {
-    var tasks = sc.tasks || [];
+    var methods = sc.methods || [];
+    var behaviors = sc.behaviors || [];
+    var rhythm = (currentCourse && currentCourse.rhythm) || ALV2.defaultRhythm();
+    var microN = behaviors.filter(function (b) { return (b.kind || 'micro') !== 'key'; }).length;
+    var keyN = behaviors.filter(function (b) { return b.kind === 'key'; }).length;
+    var maxMicro = rhythm.microCount || 8;
+    var maxKey = rhythm.keyCount || 2;
     var html = '';
     html += '<div class="loop-card" data-scene-id="' + esc(sc.id) + '">' +
       '<div class="loop-head">' +
@@ -1514,49 +1527,12 @@
       '</div>' +
       '<div class="loop-body">';
 
-    // --- 学员任务列表（每个任务是完整的子闭环）---
-    html += '<div class="section-banner acc-task">' +
-      '<span class="sb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>' +
-      '学员任务' +
-      '<span class="sb-sub">每个任务都围绕本场景展开，下面挂方法与行为</span>' +
-      '</div>';
-    tasks.forEach(function (tk, ti) {
-      html += renderTaskBlock(tk, ti, sc);
-    });
-
-    // 该场景内的新增任务按钮
-    html += '<div class="add-scene-area" style="margin-top:' + (tasks.length?12:0) + 'px" data-add-task="' + esc(sc.id) + '">' +
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y="19"/><line x1="5" y1="12" x2="19" y="12"/></svg>' +
-      '为该场景添加学员任务</div>';
-
-    // --- 场景级绩效指标（整个场景的产出/输出）---
-    html += renderSceneMetric(sc);
-
-    html += '</div></div>'; // close loop-body, loop-card
-    return html;
-  }
-
-  // ---- 渲染单个学员任务区块（v3：含内嵌的方法工具 + 高绩效行为）----
-  function renderTaskBlock(tk, ti, sc) {
-    var methods = tk.methods || [];
-    var behaviors = tk.behaviors || [];
-
-    var html = '<div class="task-block" data-task-id="' + esc(tk.id) + '" data-scene-id="' + esc(sc.id) + '">' +
-      '<div class="task-block-head">' +
-        '<div class="task-block-title"><span class="icon">T' + (ti+1) + '</span>' + esc(tk.name) + '</div>' +
-        '<div>' +
-          '<button class="icon-btn" data-op="edit-task" data-id="' + esc(tk.id) + '" title="编辑任务"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' +
-          '<button class="icon-btn danger" data-op="del-task" data-id="' + esc(tk.id) + '" data-scene="' + esc(sc.id) + '" title="删除任务"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>' +
-        '</div>' +
-      '</div>';
-    if (tk.desc) html += '<div class="task-desc">' + esc(tk.desc) + '</div>';
-    if (tk.benefit) html += '<div class="task-benefit">对学员的好处：' + esc(tk.benefit) + '</div>';
-
-    // ==== 方法工具（直接在任务下展示） ====
-    html += '<div class="task-subsection">';
-    html += '<div class="section-banner sm acc-method">' +
+    // --- 方法工具（直接挂在场景） ---
+    html += '<div class="section-banner acc-method">' +
       '<span class="sb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></span>' +
-      '方法工具</div>';
+      '方法工具' +
+      '<span class="sb-sub">学员用来落地这个场景的工具 / 方法</span>' +
+      '</div>';
     if (methods.length) {
       methods.forEach(function (m) {
         html += '<div class="method-item" data-mid="' + esc(m.id) + '">' +
@@ -1567,46 +1543,58 @@
             (m.steps && m.steps.length ? '<div class="mi-steps">' + m.steps.length + ' 步流程</div>' : '') +
           '</div>' +
           '<div class="mi-ops">' +
-            '<button class="icon-btn" data-op="edit-task-method" data-tid="' + esc(tk.id) + '" data-mid="' + esc(m.id) + '" title="编辑"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' +
-            '<button class="icon-btn danger" data-op="del-task-method" data-tid="' + esc(tk.id) + '" data-mid="' + esc(m.id) + '" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>' +
+            '<button class="icon-btn" data-op="edit-scene-method" data-sid="' + esc(sc.id) + '" data-mid="' + esc(m.id) + '" title="编辑"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' +
+            '<button class="icon-btn danger" data-op="del-scene-method" data-sid="' + esc(sc.id) + '" data-mid="' + esc(m.id) + '" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>' +
           '</div>' +
           '</div>';
       });
     }
-    html += '<div class="add-sub-btn" data-add-task-method="' + esc(tk.id) + '">' +
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y="19"/><line x1="5" y1="12" x2="19" y="12"/></svg>' +
-      '为该任务添加方法工具</div>';
-    html += '</div>'; // task-subsection
+    html += '<div class="add-sub-btn" data-add-scene-method="' + esc(sc.id) + '">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+      '为场景添加方法工具</div>';
 
-    // ==== 高绩效行为（直接在任务下展示） ====
-    html += '<div class="task-subsection">';
-    html += '<div class="section-banner sm acc-behavior">' +
+    // --- 高绩效行为（直接挂在场景，micro/key 两类） ---
+    html += '<div class="section-banner acc-behavior">' +
       '<span class="sb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7h7l-5.5 4 2 7L12 17l-6.5 4 2-7L2 9h7z"/></svg></span>' +
-      '高绩效行为</div>';
+      '高绩效行为' +
+      '<span class="sb-sub">微行为 ' + microN + '/' + maxMicro + ' · 关键行为 ' + keyN + '/' + maxKey + '</span>' +
+      '</div>';
     if (behaviors.length) {
-      behaviors.forEach(function (b) {
-        html += '<div class="behavior-item" data-bid="' + esc(b.id) + '">' +
-          '<div class="bi-dot"></div>' +
-          '<div class="bi-main">' +
-            '<div class="bi-text">' + esc(b.desc) + '</div>' +
-            '<div class="bi-meta">';
-        if (b.tinyHabit) html += '<span class="bi-tag habit">微：' + esc(b.tinyHabit.slice(0,16)) + '</span>';
-        if (b.promptWhen || b.promptWhere) html += '<span class="bi-tag prompt">提示：' + esc((b.promptWhen||b.promptWhere||'').slice(0,14)) + '</span>';
-        if (b.identity) html += '<span class="bi-tag identity">身份：' + esc(b.identity.slice(0,14)) + '</span>';
-        html += '</div></div>' +
-          '<div class="mi-ops">' +
-            '<button class="icon-btn" data-op="edit-task-behavior" data-tid="' + esc(tk.id) + '" data-bid="' + esc(b.id) + '" title="编辑"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' +
-            '<button class="icon-btn danger" data-op="del-task-behavior" data-tid="' + esc(tk.id) + '" data-bid="' + esc(b.id) + '" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>' +
-          '</div>' +
-          '</div>'; // behavior-item
-      });
+      behaviors.forEach(function (b) { html += behCard(b, sc.id); });
+    } else {
+      html += '<div class="prog-empty" style="padding:10px 14px;font-size:12.5px">还没有高绩效行为。建议添加 8 个微行为（30 秒即可完成）+ 最多 2 个关键行为（≤5 分钟）。</div>';
     }
-    html += '<div class="add-sub-btn" data-add-task-behavior="' + esc(tk.id) + '">' +
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y="19"/><line x1="5" y1="12" x2="19" y="12"/></svg>' +
-      '为该任务添加高绩效行为</div>';
-    html += '</div>'; // task-subsection
+    html += '<div style="display:flex;gap:8px;margin-top:10px">' +
+      '<div class="add-sub-btn" style="flex:1" data-add-behavior="' + esc(sc.id) + '" data-kind="micro">' + (microN >= maxMicro ? '微行为已满 (' + maxMicro + ')' : '+ 添加微行为') + '</div>' +
+      '<div class="add-sub-btn' + (keyN >= maxKey ? ' disabled' : '') + '" style="flex:1" data-add-behavior="' + esc(sc.id) + '" data-kind="key">' + (keyN >= maxKey ? '关键行为已满 (' + maxKey + ')' : '+ 添加关键行为') + '</div>' +
+      '</div>';
 
-    html += '</div>'; // task-block
+    // --- 场景级绩效指标（整个场景的产出/输出）---
+    html += renderSceneMetric(sc);
+
+    html += '</div></div>'; // close loop-body, loop-card
+    return html;
+  }
+
+  // ---- 渲染单个学员任务区块（v3：含内嵌的方法工具 + 高绩效行为）----
+  // ---- 单个高绩效行为卡片（v5：六字段展示）----
+  function behCard(b, sceneId) {
+    var isKey = b.kind === 'key';
+    var html = '<div class="behavior-item ' + (isKey ? 'key' : 'micro') + '" data-bid="' + esc(b.id) + '">' +
+      '<div class="bi-dot"></div>' +
+      '<div class="bi-main">' +
+        '<div class="bi-top"><span class="bi-tag ' + (isKey ? 'key' : 'micro') + '">' + (isKey ? '关键行为' : '微行为') + '</span></div>' +
+        '<div class="bi-text">';
+    if (b.scene) html += '<div class="bi-field"><b>场景</b>' + esc(b.scene) + '</div>';
+    if (b.challenge) html += '<div class="bi-field"><b>挑战</b>' + esc(b.challenge) + '</div>';
+    if (b.action) html += '<div class="bi-field"><b>行动/行为</b>' + esc(b.action) + '</div>';
+    if (b.expectedResult) html += '<div class="bi-field"><b>预期结果</b>' + esc(b.expectedResult) + '</div>';
+    html += '</div>' +
+        '<div class="mi-ops">' +
+          '<button class="icon-btn" data-op="edit-behavior" data-sid="' + esc(sceneId) + '" data-bid="' + esc(b.id) + '" title="编辑"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>' +
+          '<button class="icon-btn danger" data-op="del-behavior" data-sid="' + esc(sceneId) + '" data-bid="' + esc(b.id) + '" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>' +
+        '</div>' +
+      '</div>';
     return html;
   }
 
@@ -1695,92 +1683,67 @@
   function findScene(id) {
     return (currentCourse.scenarios || []).filter(function (s) { return s.id === id; })[0] || null;
   }
-  function findTask(sceneId, taskId) {
-    var sc = findScene(sceneId);
-    if (!sc) return null;
-    return (sc.tasks || []).filter(function (t) { return t.id === taskId; })[0] || null;
-  }
+
 
   // ---- 绑定构建器内所有事件 ----
+  // ---- 绑定构建器内所有事件（v5：行为直接挂在场景）----
   function bindBuilderEvents() {
-    // 添加场景
     var addFirst = document.getElementById('add-scene-first');
     if (addFirst) addFirst.onclick = function () { openSceneForm(null); };
     var addMore = document.getElementById('add-scene-more');
     if (addMore) addMore.onclick = function () { openSceneForm(null); };
 
-    // 场景级操作
     document.querySelectorAll('[data-op="edit-scene"]').forEach(function (b) {
       b.onclick = function (e) { e.stopPropagation(); openSceneForm(b.dataset.id); };
     });
     document.querySelectorAll('[data-op="del-scene"]').forEach(function (b) {
       b.onclick = function (e) {
         e.stopPropagation();
-        if (confirm('确定删除整个场景闭环？里面的任务和方法/行为也会一并清除。')) {
-          currentCourse.scenarios = currentCourse.scenarios.filter(function (s) { return s.id !== b.dataset.id; });
+        if (confirm('确定删除整个场景闭环？里面的方法工具和行为也会一并清除。')) {
+          currentCourse.scenarios = currentCourse.scenarios.filter(function (x) { return x.id !== b.dataset.id; });
           saveBuilder(); renderBuilder(); toast('已删除场景', 'ok');
         }
       };
     });
 
-    // 为场景添加任务
-    document.querySelectorAll('[data-add-task]').forEach(function (el) {
-      el.onclick = function () { openTaskForm(el.dataset.addTask, null); };
+    // 场景级方法工具增删改
+    document.querySelectorAll('[data-add-scene-method]').forEach(function (el) {
+      el.onclick = function () { openSceneMethodForm(el.dataset.addSceneMethod, null); };
     });
-
-    // 任务级操作
-    document.querySelectorAll('[data-op="edit-task"]').forEach(function (b) {
-      b.onclick = function (e) { e.stopPropagation();
-        var card = b.closest('.task-block');
-        openTaskForm(card ? card.dataset.sceneId : null, b.dataset.id);
-      };
+    document.querySelectorAll('[data-op="edit-scene-method"]').forEach(function (b) {
+      b.onclick = function (e) { e.stopPropagation(); openSceneMethodForm(b.dataset.sid, b.dataset.mid); };
     });
-    document.querySelectorAll('[data-op="del-task"]').forEach(function (b) {
-      b.onclick = function (e) { e.stopPropagation();
-        if (confirm('确定删除该学员任务？')) {
-          var sceneId = b.dataset.scene;
-          var sc = findScene(sceneId);
-          if (sc && sc.tasks) { sc.tasks = sc.tasks.filter(function (t) { return t.id !== b.dataset.id; }); }
-          saveBuilder(); renderBuilder(); toast('已删除任务', 'ok');
-        }
-      };
-    });
-
-    // ---- 任务内的方法工具增删改 ----
-    document.querySelectorAll('[data-add-task-method]').forEach(function (el) {
-      el.onclick = function () { openTaskMethodForm(el.dataset.addTaskMethod, null); };
-    });
-    document.querySelectorAll('[data-op="edit-task-method"]').forEach(function (b) {
-      b.onclick = function (e) { e.stopPropagation(); openTaskMethodForm(b.dataset.tid, b.dataset.mid); };
-    });
-    document.querySelectorAll('[data-op="del-task-method"]').forEach(function (b) {
+    document.querySelectorAll('[data-op="del-scene-method"]').forEach(function (b) {
       b.onclick = function (e) { e.stopPropagation();
         if (confirm('确定删除该方法工具？')) {
-          var tk = findTask(findTaskScene(b), b.dataset.tid);
-          if (tk && tk.methods) { tk.methods = tk.methods.filter(function (m) { return m.id !== b.dataset.mid; }); }
+          var sc = findScene(b.dataset.sid);
+          if (sc && sc.methods) { sc.methods = sc.methods.filter(function (m) { return m.id !== b.dataset.mid; }); }
           saveBuilder(); renderBuilder(); toast('已删除方法工具', 'ok');
         }
       };
     });
 
-    // ---- 任务内的高绩效行为增删改 ----
-    document.querySelectorAll('[data-add-task-behavior]').forEach(function (el) {
-      el.onclick = function () { openTaskBehaviorForm(el.dataset.addTaskBehavior, null); };
+    // 高绩效行为增删改
+    document.querySelectorAll('[data-add-behavior]').forEach(function (el) {
+      el.onclick = function () {
+        if (el.classList.contains('disabled')) { toast('该类行为已达上限', 'err'); return; }
+        openBehaviorForm(el.dataset.addBehavior, null, el.dataset.kind);
+      };
     });
-    document.querySelectorAll('[data-op="edit-task-behavior"]').forEach(function (b) {
-      b.onclick = function (e) { e.stopPropagation(); openTaskBehaviorForm(b.dataset.tid, b.dataset.bid); };
+    document.querySelectorAll('[data-op="edit-behavior"]').forEach(function (b) {
+      b.onclick = function (e) { e.stopPropagation(); openBehaviorForm(b.dataset.sid, b.dataset.bid, null); };
     });
-    document.querySelectorAll('[data-op="del-task-behavior"]').forEach(function (b) {
+    document.querySelectorAll('[data-op="del-behavior"]').forEach(function (b) {
       b.onclick = function (e) { e.stopPropagation();
         if (confirm('确定删除该高绩效行为？')) {
-          var tk = findTask(findTaskScene(b), b.dataset.tid);
-          if (tk && tk.behaviors) { tk.behaviors = tk.behaviors.filter(function (b2) { return b2.id !== b.dataset.bid; }); }
+          var sc = findScene(b.dataset.sid);
+          if (sc && sc.behaviors) { sc.behaviors = sc.behaviors.filter(function (x) { return x.id !== b.dataset.bid; }); }
           saveBuilder(); renderBuilder(); toast('已删除高绩效行为', 'ok');
         }
       };
     });
 
-    // ---- 场景级绩效指标 ----
+    // 场景级绩效指标
     document.querySelectorAll('[data-add-scene-metric]').forEach(function (btn) {
       btn.onclick = function () { openSceneMetricForm(btn.dataset.addSceneMetric); };
     });
@@ -1807,10 +1770,7 @@
   }
 
   /* 从操作按钮向上找到所属场景 ID */
-  function findTaskScene(btn) {
-    var card = btn.closest('.task-block');
-    return card ? card.dataset.sceneId : null;
-  }
+
 
   // =====================================================================
   //  表单模态（场景 / 任务 / 任务内方法 / 任务内行为 / 场景指标）
@@ -1834,31 +1794,37 @@
   }
 
   // ---- 任务表单 ----
-  function openTaskForm(sceneId, taskId) {
-    itemFormField = 'task'; itemFormId = taskId; itemFormParentId = sceneId;
+  // ---- 高绩效行为表单（v5：六字段 + micro/key 两类）----
+  function openBehaviorForm(sceneId, behaviorId, presetKind) {
+    itemFormField = 'behavior'; itemFormId = behaviorId; itemFormParentId = sceneId;
     var sc = findScene(sceneId);
-    var tk = taskId && sc ? (sc.tasks || []).filter(function (t) { return t.id === taskId; })[0] : null;
-    document.getElementById('item-modal-title').textContent = tk ? '编辑学员任务' : '为场景添加学员任务';
+    var b = behaviorId && sc ? (sc.behaviors || []).filter(function (x) { return x.id === behaviorId; })[0] : null;
+    var kind = b ? b.kind : (presetKind || 'micro');
+    document.getElementById('item-modal-title').textContent = b ? '编辑高绩效行为' : '添加高绩效行为';
     var body = document.getElementById('item-modal-body');
+    var kindOpts = '<label class="rl"><input type="radio" name="b_kind" value="micro" ' + (kind !== 'key' ? 'checked' : '') + ' disabled> 微行为 <span>30 秒即可完成</span></label>' +
+      '<label class="rl"><input type="radio" name="b_kind" value="key" ' + (kind === 'key' ? 'checked' : '') + ' disabled> 关键行为 <span>≤5 分钟，可改场景/挑战/行动</span></label>';
     body.innerHTML =
-      '<div class="field"><label>任务名称<span class="req">*</span></label>' +
-        '<input class="in" id="f_task_name" value="' + esc(tk ? tk.name : '') + '" placeholder="例如：完成战略规划全局方案" /></div>' +
-      '<div class="field"><label>任务描述</label>' +
-        '<textarea class="in" id="f_task_desc" rows="2" placeholder="学员需要具体做什么…">' + esc(tk ? tk.desc : '') + '</textarea></div>' +
-      '<div class="field"><label>对学员的好处</label>' +
-        '<input class="in" id="f_task_benefit" value="' + esc(tk ? tk.benefit : '') + '" placeholder="完成这个任务对学员个人有什么收益？" /></div>' +
-      '<input type="hidden" id="f_task_scene" value="' + esc(sceneId || '') + '" />';
+      (b ? '<div class="field"><label>行为类型</label><div class="rg">' + kindOpts + '</div></div>' : '') +
+      '<div class="field"><label>场景<span class="req">*</span></label>' +
+        '<input class="in" id="f_b_scene" value="' + esc(b ? b.scene : (sc ? sc.name : '')) + '" placeholder="这个行为发生在什么工作场景" /></div>' +
+      '<div class="field"><label>挑战</label>' +
+        '<input class="in" id="f_b_challenge" value="' + esc(b ? b.challenge : (sc ? sc.challenge : '')) + '" placeholder="在这个场景里，学员面临的最大阻力" /></div>' +
+      '<div class="field"><label>行动 / 行为<span class="req">*</span></label>' +
+        '<textarea class="in" id="f_b_action" rows="2" placeholder="学员具体采取什么高绩效行为 / 行动">' + esc(b ? b.action : '') + '</textarea></div>' +
+      '<div class="field"><label>预期结果 / 影响</label>' +
+        '<textarea class="in" id="f_b_expected" rows="2" placeholder="做了这个行为，预期带来什么结果或影响">' + esc(b ? b.expectedResult : '') + '</textarea></div>';
     document.getElementById('item-overlay').classList.add('show');
   }
 
-  // ---- 任务内方法工具表单 ----
-  function openTaskMethodForm(taskId, methodId) {
-    itemFormField = 'task_method'; itemFormId = methodId; itemFormParentId = taskId;
-    var tk = findTask(findSceneByIdTask(taskId), taskId);
-    var m = methodId && tk ? (tk.methods||[]).filter(function(x){return x.id===methodId;})[0] : null;
+  // ---- 场景级方法工具表单（v5：方法工具直接挂场景）----
+  function openSceneMethodForm(sceneId, methodId) {
+    itemFormField = 'scene_method'; itemFormId = methodId; itemFormParentId = sceneId;
+    var sc = findScene(sceneId);
+    var m = methodId && sc ? (sc.methods || []).filter(function (x) { return x.id === methodId; })[0] : null;
     document.getElementById('item-modal-title').textContent = m ? '编辑方法工具' : '添加方法工具';
     var body = document.getElementById('item-modal-body');
-    var html = '<div class="field"><label>工具名称<span class="req">*</span></label>' +
+    body.innerHTML = '<div class="field"><label>工具名称<span class="req">*</span></label>' +
       '<input class="in" id="f_m_name" value="' + esc(m ? m.name : '') + '" placeholder="例如：战略规划的全局流程" /></div>' +
       '<div class="field"><label>说明</label>' +
       '<input class="in" id="f_m_desc" value="' + esc(m ? m.desc : '') + '" placeholder="这个工具解决什么问题？" /></div>' +
@@ -1866,35 +1832,10 @@
       '<textarea class="in" id="f_m_steps" rows="4" placeholder="每写一条步骤，回车换行">' + esc(m && m.steps ? m.steps.join('\n') : '') + '</textarea></div>' +
       '<div class="field"><label>预期产出</label>' +
       '<input class="in" id="f_m_output" value="' + esc(m ? m.output : '') + '" placeholder="使用这个工具后会产出什么？" /></div>';
-    body.innerHTML = html;
     document.getElementById('item-overlay').classList.add('show');
   }
 
-  // ---- 任务内高绩效行为表单 ----
-  function openTaskBehaviorForm(taskId, behaviorId) {
-    itemFormField = 'task_behavior'; itemFormId = behaviorId; itemFormParentId = taskId;
-    var tk = findTask(findSceneByIdTask(taskId), taskId);
-    var b = behaviorId && tk ? (tk.behaviors||[]).filter(function(x){return x.id===behaviorId;})[0] : null;
-    document.getElementById('item-modal-title').textContent = b ? '编辑高绩效行为' : '添加高绩效行为';
-    var body = document.getElementById('item-modal-body');
-    var html =
-      '<div class="field"><label>行为描述（高绩效表现）<span class="req">*</span></label>' +
-        '<input class="in" id="f_b_desc" value="' + esc(b ? b.desc : '') + '" placeholder="例如：能够准备相关的事实信息和假设" /></div>' +
-      '<div class="field"><label>观察信号（如何判断发生了）</label>' +
-        '<input class="in" id="f_b_signal" value="' + esc(b ? b.signal : '') + '" placeholder="看到什么就说明这个行为发生了" /></div>' +
-      '<div class="field"><label>微小习惯拆解（做极小一步）</label>' +
-        '<input class="in" id="f_b_habit" value="' + esc(b ? b.tinyHabit : '') + '" placeholder="极小的第一步是什么" /></div>' +
-      '<div class="field"><label>场景化提示 · 何时</label>' +
-        '<input class="in" id="f_b_when" value="' + esc(b ? b.promptWhen : '') + '" placeholder="在什么时候触发" /></div>' +
-      '<div class="field"><label>场景化提示 · 何地</label>' +
-        '<input class="in" id="f_b_where" value="' + esc(b ? b.promptWhere : '') + '" placeholder="在什么地方触发" /></div>' +
-      '<div class="field"><label>身份叙事（你正在成为___的人）</label>' +
-        '<input class="in" id="f_b_identity" value="' + esc(b ? b.identity : '') + '" placeholder="例如：你正在成为用数据管理的经营者" /></div>';
-    body.innerHTML = html;
-    document.getElementById('item-overlay').classList.add('show');
-  }
-
-  // ---- 场景级绩效指标表单 ----
+  // ---- 场景级绩效指标表单（不变）----
   function openSceneMetricForm(sceneId) {
     itemFormField = 'scene_metric'; itemFormId = sceneId;
     var sc = findScene(sceneId);
@@ -1913,16 +1854,7 @@
     document.getElementById('item-overlay').classList.add('show');
   }
 
-  /* 通过 taskId 找到所属场景 */
-  function findSceneByIdTask(taskId) {
-    var scenes = currentCourse.scenarios || [];
-    for (var i = 0; i < scenes.length; i++) {
-      if ((scenes[i].tasks||[]).some(function(t){return t.id===taskId;})) return scenes[i].id;
-    }
-    return null;
-  }
-
-  // ---- 统一保存逻辑 ----
+  // ---- 统一保存逻辑（v5）----
   document.getElementById('item-save').onclick = function () {
     var field = itemFormField, id = itemFormId;
 
@@ -1930,7 +1862,7 @@
       var name = document.getElementById('f_scene_name').value.trim();
       if (!name) { toast('请填写场景名称', 'err'); return; }
       var obj = id ? findScene(id) : null;
-      if (!obj) { obj = { id: ALV2.uid('scene'), tasks: [] }; currentCourse.scenarios = currentCourse.scenarios || []; currentCourse.scenarios.push(obj); }
+      if (!obj) { obj = { id: ALV2.uid('scene') }; currentCourse.scenarios = currentCourse.scenarios || []; currentCourse.scenarios.push(obj); }
       obj.name = name;
       obj.challenge = document.getElementById('f_scene_challenge').value.trim();
       obj.desc = document.getElementById('f_scene_desc').value.trim();
@@ -1939,74 +1871,62 @@
       renderBuilder();
       toast(id ? '已更新场景' : '已添加场景', 'ok');
     }
-    else if (field === 'task') {
-      var tName = document.getElementById('f_task_name').value.trim();
-      if (!tName) { toast('请填写任务名称', 'err'); return; }
-      var sceneId = document.getElementById('f_task_scene').value;
-      var sc = findScene(sceneId);
+    else if (field === 'behavior') {
+      var bAction = document.getElementById('f_b_action').value.trim();
+      if (!bAction) { toast('请填写行动 / 行为', 'err'); return; }
+      var sc = findScene(itemFormParentId);
       if (!sc) { toast('找不到所属场景', 'err'); return; }
-      sc.tasks = sc.tasks || [];
-      var tk = id ? sc.tasks.filter(function (t) { return t.id === id; })[0] : null;
-      if (!tk) { tk = { id: ALV2.uid('task'), methods: [], behaviors: [] }; sc.tasks.push(tk); }
-      tk.name = tName;
-      tk.desc = document.getElementById('f_task_desc').value.trim();
-      tk.benefit = document.getElementById('f_task_benefit').value.trim();
+      sc.behaviors = sc.behaviors || [];
+      var rhythm = (currentCourse && currentCourse.rhythm) || ALV2.defaultRhythm();
+      var maxMicro = rhythm.microCount || 8, maxKey = rhythm.keyCount || 2;
+      var kindEl = document.querySelector('input[name=b_kind]:checked');
+      var isKey = (kindEl ? kindEl.value : 'micro') === 'key';
+      if (!id) {
+        var cntKey = sc.behaviors.filter(function (x) { return x.kind === 'key'; }).length;
+        var cntMicro = sc.behaviors.filter(function (x) { return x.kind !== 'key'; }).length;
+        if (isKey && cntKey >= maxKey) { toast('关键行为已达上限（' + maxKey + '）', 'err'); return; }
+        if (!isKey && cntMicro >= maxMicro) { toast('微行为已达上限（' + maxMicro + '）', 'err'); return; }
+      }
+      var b = id ? sc.behaviors.filter(function (x) { return x.id === id; })[0] : null;
+      if (!b) { b = { id: ALV2.uid('behavior'), order: sc.behaviors.length }; sc.behaviors.push(b); }
+      b.kind = isKey ? 'key' : 'micro';
+      b.scene = document.getElementById('f_b_scene').value.trim();
+      b.challenge = document.getElementById('f_b_challenge').value.trim();
+      b.action = bAction;
+      b.expectedResult = document.getElementById('f_b_expected').value.trim();
       saveBuilder();
       document.getElementById('item-overlay').classList.remove('show');
       renderBuilder();
-      toast(id ? '已更新任务' : '已添加任务', 'ok');
+      toast(id ? '已更新高绩效行为' : '已添加高绩效行为', 'ok');
     }
-    else if (field === 'task_method') {
+    else if (field === 'scene_method') {
       var mName = document.getElementById('f_m_name').value.trim();
       if (!mName) { toast('请填写工具名称', 'err'); return; }
-      var tid = itemFormParentId;
-      var sId = findSceneByIdTask(tid);
-      var tk = findTask(sId, tid);
-      if (!tk) { toast('找不到所属任务', 'err'); return; }
-      tk.methods = tk.methods || [];
-      var m = id ? tk.methods.filter(function(x){return x.id===id;})[0] : null;
-      if (!m) { m = { id: ALV2.uid('method') }; tk.methods.push(m); }
+      var scm = findScene(itemFormParentId);
+      if (!scm) { toast('找不到所属场景', 'err'); return; }
+      scm.methods = scm.methods || [];
+      var m = id ? scm.methods.filter(function (x) { return x.id === id; })[0] : null;
+      if (!m) { m = { id: ALV2.uid('method') }; scm.methods.push(m); }
       m.name = mName;
       m.desc = document.getElementById('f_m_desc').value.trim();
       var stepsStr = document.getElementById('f_m_steps').value;
-      m.steps = stepsStr ? stepsStr.split('\n').map(function(s){return s.trim();}).filter(function(s){return s;}) : [];
+      m.steps = stepsStr ? stepsStr.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s; }) : [];
       m.output = document.getElementById('f_m_output').value.trim();
       saveBuilder();
       document.getElementById('item-overlay').classList.remove('show');
       renderBuilder();
       toast(id ? '已更新方法工具' : '已添加方法工具', 'ok');
     }
-    else if (field === 'task_behavior') {
-      var bDesc = document.getElementById('f_b_desc').value.trim();
-      if (!bDesc) { toast('请填写行为描述', 'err'); return; }
-      var tid2 = itemFormParentId;
-      var sId2 = findSceneByIdTask(tid2);
-      var tk2 = findTask(sId2, tid2);
-      if (!tk2) { toast('找不到所属任务', 'err'); return; }
-      tk2.behaviors = tk2.behaviors || [];
-      var b = id ? tk2.behaviors.filter(function(x){return x.id===id;})[0] : null;
-      if (!b) { b = { id: ALV2.uid('behavior') }; tk2.behaviors.push(b); }
-      b.desc = bDesc;
-      b.signal = document.getElementById('f_b_signal').value.trim();
-      b.tinyHabit = document.getElementById('f_b_habit').value.trim();
-      b.promptWhen = document.getElementById('f_b_when').value.trim();
-      b.promptWhere = document.getElementById('f_b_where').value.trim();
-      b.identity = document.getElementById('f_b_identity').value.trim();
-      saveBuilder();
-      document.getElementById('item-overlay').classList.remove('show');
-      renderBuilder();
-      toast(id ? '已更新高绩效行为' : '已添加高绩效行为', 'ok');
-    }
     else if (field === 'scene_metric') {
       var metName = document.getElementById('f_met_name').value.trim();
       if (!metName) { toast('请填写指标名称', 'err'); return; }
-      var sc = findScene(id);
-      if (!sc) { toast('找不到场景', 'err'); return; }
-      sc.metric = sc.metric || {};
-      sc.metric.name = metName;
-      sc.metric.baseline = document.getElementById('f_met_baseline').value.trim();
-      sc.metric.target = document.getElementById('f_met_target').value.trim();
-      sc.metric.desc = document.getElementById('f_met_desc').value.trim();
+      var scm2 = findScene(id);
+      if (!scm2) { toast('找不到场景', 'err'); return; }
+      scm2.metric = scm2.metric || {};
+      scm2.metric.name = metName;
+      scm2.metric.baseline = document.getElementById('f_met_baseline').value.trim();
+      scm2.metric.target = document.getElementById('f_met_target').value.trim();
+      scm2.metric.desc = document.getElementById('f_met_desc').value.trim();
       saveBuilder();
       document.getElementById('item-overlay').classList.remove('show');
       renderBuilder();
@@ -2058,6 +1978,7 @@
   }
 
   /* 不可删示范样例：全链路注入（配置 + 5 虚拟学员 + 两周打卡） */
+  /* 不可删示范样例：全链路注入（配置 + 5 虚拟学员 + 10 条高绩效行为提交） */
   function injectSample() {
     var sku = ALV2_SAMPLE.SAMPLE_SKU;
     if (ALV2.store.get(sku, 'config', null)) return;
@@ -2065,47 +1986,14 @@
     ALV2.store.set(sku, 'config', c);
     var sts = ALV2_SAMPLE.students();
     ALV2.store.set(sku, 'students', sts);
-    var cis = genSampleCheckins(c, sts);
-    Object.keys(cis).forEach(function (sid) { ALV2.store.set(sku, 'checkins:' + sid, cis[sid]); });
+    sts.forEach(function (st) {
+      var subs = ALV2_SAMPLE.buildSubmissions(c, st);
+      ALV2.store.set(sku, 'subs:' + st.id, subs);
+    });
   }
   function autoSeedSample() {
     try { injectSample(); } catch (e) { console.error('示范课自动注入失败', e); }
     renderCourses();
-  }
-
-  /* 生成多学员两周打卡：坚持 / 起伏 / 中断 / 慢热 / 旁观 五种画像 */
-  function genSampleCheckins(course, students) {
-    var sched = ALV2.schedulePlan(course);
-    var behIds = [];
-    (course.scenarios[0].tasks[0].behaviors).forEach(function (b) { behIds.push(b.id); });
-    var taskId = course.scenarios[0].tasks[0].id, sceneId = course.scenarios[0].id;
-    var profiles = { s_a: 'persist', s_b: 'wave', s_c: 'drop', s_d: 'late', s_e: 'idle' };
-    var out = {};
-    students.forEach(function (st) {
-      out[st.id] = [];
-      var prof = profiles[st.id] || 'idle';
-      sched.days.forEach(function (d, di) {
-        if (di > 4) return; // 只填充已过去的日子，制造"进行中"的真实感
-        behIds.forEach(function (bid, bi) {
-          var stt = decideStatus(prof, di, bi, behIds.length);
-          if (!stt) return;
-          var dt = new Date(d.date); dt.setHours(9 + (bi % 6), 8 * (bi % 5), 0, 0);
-          out[st.id].push({
-            id: ALV2.uid('ck'), behaviorId: bid, sceneId: sceneId, taskId: taskId,
-            status: stt, note: '', identitySignal: false, ts: dt.getTime()
-          });
-        });
-      });
-    });
-    return out;
-  }
-  function decideStatus(prof, di, bi, n) {
-    if (prof === 'persist') return di <= 4 ? 'persisting' : null;
-    if (prof === 'wave') return di % 2 === 0 ? 'persisting' : (bi % 2 ? 'dropped' : 'persisting');
-    if (prof === 'drop') return di <= 2 ? 'persisting' : 'dropped';
-    if (prof === 'late') return di < 2 ? null : 'persisting';
-    if (prof === 'idle') return di === 0 && bi === 0 ? 'tried' : null;
-    return null;
   }
 
   /* 复制示范课为可编辑副本 */
@@ -2273,14 +2161,14 @@
     if (!raw) { msg.textContent = '请先粘贴学员发来的提交码。'; msg.style.color = 'var(--danger)'; return; }
     try {
       var obj = JSON.parse(seDecode(raw));
-      if (!obj.sku || !obj.checkins) throw new Error('格式不正确');
-      var arr = ALV2.store.get(obj.sku, 'checkins:' + obj.studentId, []);
-      var seen = {}; arr.forEach(function (x) { seen[x.id] = 1; });
+      if (!obj.sku || !obj.submissions) throw new Error('格式不正确');
+      var arr = ALV2.store.get(obj.sku, 'subs:' + obj.studentId, []);
+      var seen = {}; arr.forEach(function (x) { seen[x.behaviorId + '|' + (x.ts || '')] = 1; });
       var added = 0;
-      obj.checkins.forEach(function (ci) { if (!seen[ci.id]) { arr.push(ci); seen[ci.id] = 1; added++; } });
-      ALV2.store.set(obj.sku, 'checkins:' + obj.studentId, arr);
+      obj.submissions.forEach(function (ci) { var key = ci.behaviorId + '|' + (ci.ts || ''); if (!seen[key]) { arr.push(ci); seen[key] = 1; added++; } });
+      ALV2.store.set(obj.sku, 'subs:' + obj.studentId, arr);
       msg.style.color = 'var(--success)';
-      msg.textContent = '已导入「' + (obj.studentName || obj.studentId) + '」的 ' + added + ' 条打卡（已去重合并）。可到「复盘评价」查看。';
+      msg.textContent = '已导入「' + (obj.studentName || obj.studentId) + '」的 ' + added + ' 条提交（已去重合并）。可到「复盘评价」查看。';
       ta.value = '';
     } catch (e) {
       msg.style.color = 'var(--danger)';
@@ -2289,15 +2177,13 @@
   }
   function seDecode(s) { s = (s || '').replace(/^d=/, '').replace(/^#/, ''); s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
 
-  // 供 P3 复盘模块复用
-  function statusLabel(s) { return s === 'persisting' ? '在坚持' : (s === 'tried' ? '试了一步' : '先放一放'); }
   function fmtDate(ts) { var d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate(); }
   //  P3：复盘评价模块
   // ============================================================
   var RV = {
     currentCourse: null,
     students: [],
-    reviews: {},   // { studentName: { A: score, B: score, C: score, feedback, reviewer } }
+    reviews: {},   // { studentName: { keyFeedback:{[behaviorId]:{text,rating}}, microSummary, overall:{A,B,C,feedback}, saved, reviewer } }
     _ns: function () { return RV.currentCourse; },
 
     // --- 主渲染入口 ---
@@ -2343,87 +2229,131 @@
     },
 
     // --- 学员复盘列表 ---
+    // --- 学员复盘列表（schema@5：逐条关键行为 + 微行为整体 + 可选 A/B/C 总评）---
     renderStudents: function () {
       var container = document.getElementById('rv-tab-students');
       if (RV.students.length === 0) {
         container.innerHTML = '<div class="rv-empty" style="text-align:center;padding:40px 20px;color:var(--ink-3);font-size:14px">' +
           '<svg class="rv-empty-ill" viewBox="0 0 120 120" fill="none" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="#EEF0FF"/><circle cx="46" cy="50" r="13" fill="#fff" stroke="#C7CBFF" stroke-width="2.4"/><path d="M30 86c0-12 7-20 16-20s16 8 16 20" fill="#fff" stroke="#C7CBFF" stroke-width="2.4"/><circle cx="84" cy="54" r="9" fill="#fff" stroke="#C7CBFF" stroke-width="2.2"/><path d="M74 80c0-8 5-13 11-13s10 5 10 13" fill="#fff" stroke="#C7CBFF" stroke-width="2.2"/></svg>' +
-          '<div style="max-width:300px;margin:6px auto 0;line-height:1.7">还没有学员的复盘数据。<br>先到「学员端」添加学员，等他们用手机微打卡后，这里会自动出现每个人的成长轨迹。</div></div>';
+          '<div style="max-width:300px;margin:6px auto 0;line-height:1.7">还没有学员的复盘数据。<br>先到「学员端」添加学员，等他们用手机完成 10 次学习迁移后，这里会自动出现每个人的成长轨迹。</div></div>';
         return;
       }
       var course = ALV2.store.get(RV.currentCourse);
+      var fbMap = {}; flatBehaviors(course).forEach(function (o) { fbMap[o.behaviorId] = o; });
+      var keys = flatBehaviors(course).filter(function (o) { return o.kind === 'key'; });
+      var micros = flatBehaviors(course).filter(function (o) { return o.kind !== 'key'; });
+      function subFor(arr, bid) { for (var i = 0; i < (arr || []).length; i++) if (arr[i].behaviorId === bid) return arr[i]; return null; }
+
       var html = '<div class="rv-student-list">';
-      RV.students.forEach(function (st, si) {
-        var rev = RV.reviews[st.name] || {};
-        var checks = st.checkins || [];
-        var doneCount = checks.filter(function (c) { return c.status === 'tried' || c.status === 'persisting'; }).length;
-        var persistCount = checks.filter(function (c) { return c.status === 'persisting'; }).length;
+      RV.students.forEach(function (st) {
+        var rev = RV.reviews[st.name] || { keyFeedback: {}, microSummary: '', overall: {}, saved: false };
+        if (!rev.keyFeedback) rev.keyFeedback = {};
+        if (!rev.overall) rev.overall = {};
+        var subs = st.subs || [];
+        var comp = ALV2.completion(course, subs);
+        var keyDone = keys.filter(function (o) { return subFor(subs, o.behaviorId); }).length;
+        var microDone = micros.filter(function (o) { return subFor(subs, o.behaviorId); }).length;
 
         html += '<div class="rv-student-card">' +
           '<div class="rv-shead"><div class="rv-sname">' +
             '<div class="rv-avatar">' + esc(st.name.charAt(0)) + '</div>' +
             '<div class="rv-sinfo"><h4>' + esc(st.name) + '</h4><p>添加于 ' + (st.addedAt ? new Date(st.addedAt).toLocaleDateString() : '-') + '</p></div>' +
           '</div><div class="rv-sstats">' +
-            '<div class="rv-stat"><div class="rv-stat-num">' + doneCount + '</div><div class="rv-stat-lbl">已打卡</div></div>' +
-            '<div class="rv-stat"><div class="rv-stat-num">' + persistCount + '</div><div class="rv-stat-lbl">在坚持</div></div>' +
-            '<div class="rv-stat"><div class="rv-stat-num">' + checks.length + '</div><div class="rv-stat-lbl">总记录</div></div>' +
+            '<div class="rv-stat"><div class="rv-stat-num">' + comp.done + '/' + comp.total + '</div><div class="rv-stat-lbl">行为完成</div></div>' +
+            '<div class="rv-stat"><div class="rv-stat-num">' + keyDone + '/' + keys.length + '</div><div class="rv-stat-lbl">关键行为</div></div>' +
+            '<div class="rv-stat"><div class="rv-stat-num">' + microDone + '/' + micros.length + '</div><div class="rv-stat-lbl">微行为</div></div>' +
           '</div></div>';
 
-        // 打卡时间线
-        html += '<div class="rv-timeline"><div class="rv-tl-title">' + AL.icon('step',{size:15,cls:'al-ic'}) + ' 打卡时间线</div>';
-        if (checks.length === 0) {
-          html += '<div style="color:var(--ink-3);font-size:12.5px;padding:10px 0">暂无打卡记录</div>';
+        // 提交内容时间线（六字段）
+        html += '<div class="rv-timeline"><div class="rv-tl-title">' + AL.icon('step',{size:15,cls:'al-ic'}) + ' 学习迁移记录</div>';
+        if (subs.length === 0) {
+          html += '<div style="color:var(--ink-3);font-size:12.5px;padding:10px 0">该学员尚未提交任何学习迁移记录。</div>';
         } else {
-          checks.slice().reverse().forEach(function (ck) {
-            var dotCls = ck.status === 'persisting' ? 'persisting' : (ck.status === 'tried' ? 'done' : 'skipped');
-            html += '<div class="rv-tl-item"><div class="rv-tl-dot ' + dotCls + '"></div>' +
-              '<div class="rv-tl-body">' +
-                '<div class="rv-tl-beh">' + esc(ck.behaviorName) + '</div>' +
-                '<div class="rv-tl-meta">' + statusLabel(ck.status) + ' · ' + fmtDate(ck.ts) +
-                  (ck.confirmedIdentity ? ' · ' + AL.icon('check',{size:13,cls:'al-ic'}) + '确认身份' : '') + '</div>';
-            if (ck.note) html += '<div class="rv-tl-note">' + esc(ck.note) + '</div>';
-            html += '</div><div class="rv-tl-time">' + new Date(ck.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div></div>';
+          subs.slice().reverse().forEach(function (s) {
+            var o = fbMap[s.behaviorId];
+            var knd = (o && o.kind === 'key') ? 'key' : 'micro';
+            var actLabel = (s.action && s.action.length > 40) ? s.action.slice(0,40) + '…' : (s.action || (o ? o.b.action : '行为'));
+            html += '<div class="rv-tl-item"><div class="rv-tl-dot ' + knd + '"></div>' +
+              '<div class="rv-tl-body"><div class="rv-tl-beh">' + esc(actLabel) + '</div>' +
+              '<div class="rv-tl-meta">' + (o ? kindLabel(o.kind) : '行为') + ' · ' + fmtDate(s.ts) + (s.edited ? ' · 学员改写' : '') + '</div>';
+            var detail = [];
+            if (s.scene) detail.push('<b>场景</b> ' + esc(s.scene));
+            if (s.challenge) detail.push('<b>挑战</b> ' + esc(s.challenge));
+            if (s.action) detail.push('<b>行动</b> ' + esc(s.action));
+            if (s.resultImpact) detail.push('<b>结果/影响</b> ' + esc(s.resultImpact));
+            if (s.difficulty) detail.push('<b>困难</b> ' + esc(s.difficulty));
+            if (s.futureApplication) detail.push('<b>未来应用</b> ' + esc(s.futureApplication));
+            if (detail.length) html += '<div class="rv-tl-note">' + detail.join('　') + '</div>';
+            html += '</div><div class="rv-tl-time">' + new Date(s.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div></div>';
           });
         }
         html += '</div>'; // timeline
 
-        // 三维度打分区
+        // 复盘评价区
         html += '<div class="rv-score-area" data-student="' + esc(st.name) + '">' +
-          '<div style="font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:4px">' + AL.icon('target',{size:15,cls:'al-ic'}) + ' 三维度评价</div>' +
+          '<div style="font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:10px">' + AL.icon('target',{size:15,cls:'al-ic'}) + ' 复盘评价（关键行为逐条 + 微行为整体）</div>';
+
+        // 关键行为逐条
+        html += '<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px"><div class="rv-sub-t" style="margin:0 0 8px;font-weight:700">关键行为 · 逐条具体反馈（' + keys.length + ' 条）</div>';
+        if (keys.length === 0) {
+          html += '<div style="color:var(--ink-3);font-size:12.5px;padding:6px 0">本课程未配置关键行为。</div>';
+        } else {
+          keys.forEach(function (o) {
+            var s = subFor(subs, o.behaviorId);
+            var kf = rev.keyFeedback[o.behaviorId] || { text: '', rating: '' };
+            html += '<div style="border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:10px" data-bid="' + esc(o.behaviorId) + '">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><span class="rp-chip b">' + esc(o.b.action || '关键行为') + '</span>' +
+              '<select class="rv-rating" data-rating="' + esc(o.behaviorId) + '" style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);font-size:12px">' +
+              '<option value=""' + (kf.rating === '' ? ' selected' : '') + '>评级—</option>' +
+              '<option value="A"' + (kf.rating === 'A' ? ' selected' : '') + '>A 优秀</option>' +
+              '<option value="B"' + (kf.rating === 'B' ? ' selected' : '') + '>B 良好</option>' +
+              '<option value="C"' + (kf.rating === 'C' ? ' selected' : '') + '>C 需加强</option></select></div>';
+            if (!s) {
+              html += '<div style="font-size:12px;color:var(--ink-3);background:var(--surface-2);border-radius:8px;padding:8px 10px;margin-bottom:8px">该学员尚未提交此关键行为（' + esc(o.b.scene || o.scenarioTitle) + '），暂无法复盘。</div>';
+            } else {
+              var det = [];
+              if (s.scene) det.push('<b>场景</b> ' + esc(s.scene));
+              if (s.challenge) det.push('<b>挑战</b> ' + esc(s.challenge));
+              if (s.action) det.push('<b>行动</b> ' + esc(s.action));
+              if (s.resultImpact) det.push('<b>结果/影响</b> ' + esc(s.resultImpact));
+              if (s.difficulty) det.push('<b>困难</b> ' + esc(s.difficulty));
+              if (s.futureApplication) det.push('<b>未来应用</b> ' + esc(s.futureApplication));
+              html += '<div style="font-size:12px;color:var(--ink-2);line-height:1.7;background:var(--surface-2);border-radius:8px;padding:8px 10px;margin-bottom:8px">' + det.join('　') + '</div>';
+            }
+            html += '<textarea class="in rv-kf-textarea" data-kf="' + esc(o.behaviorId) + '" placeholder="针对这条关键行为的具体复盘反馈（点出他真实做到/没做到的、结合他写的结果与困难）…">' + esc(kf.text || '') + '</textarea>';
+            html += '</div>';
+          });
+        }
+        html += '</div>';
+
+        // 微行为整体复盘
+        html += '<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px"><div class="rv-sub-t" style="margin:0 0 8px;font-weight:700">微行为 · 整体复盘（' + micros.length + ' 条）</div>' +
+          '<textarea class="in rv-micro-textarea" placeholder="对这 ' + micros.length + ' 条微行为的整体复盘：肯定共性亮点 + 1 条可改进方向，口语、具体…">' + esc(rev.microSummary || '') + '</textarea></div>';
+
+        // 可选 A/B/C 总评
+        html += '<div style="border:1px solid var(--line);border-radius:12px;padding:12px"><div class="rv-sub-t" style="margin:0 0 8px;font-weight:700">可选 · 三维度总评（A 行为改变 / B 场景融入 / C 绩效改善）</div>' +
           '<div class="rv-score-grid">' +
-            '<div class="rv-score-item"><div class="rv-score-label">A 行为改变<span>微小习惯+身份</span></div>' +
-              '<div><input class="rv-score-input" type="number" min="0" max="10" data-dim="A" value="' + (rev.A !== undefined ? rev.A : '') + '" placeholder="-" /><span class="rv-score-max">/10</span></div></div>' +
-            '<div class="rv-score-item"><div class="rv-score-label">B 场景融入<span>工作流迁移</span></div>' +
-              '<div><input class="rv-score-input" type="number" min="0" max="10" data-dim="B" value="' + (rev.B !== undefined ? rev.B : '') + '" placeholder="-" /><span class="rv-score-max">/10</span></div></div>' +
-            '<div class="rv-score-item"><div class="rv-score-label">C 绩效改善<span>业务结果</span></div>' +
-              '<div><input class="rv-score-input" type="number" min="0" max="10" data-dim="C" value="' + (rev.C !== undefined ? rev.C : '') + '" placeholder="-" /><span class="rv-score-max">/10</span></div></div>' +
+            '<div class="rv-score-item"><div class="rv-score-label">A 行为改变<span>习惯+身份</span></div><div><input class="rv-score-input" type="number" min="0" max="10" data-dim="A" value="' + (rev.overall.A !== undefined ? rev.overall.A : '') + '" placeholder="-" /><span class="rv-score-max">/10</span></div></div>' +
+            '<div class="rv-score-item"><div class="rv-score-label">B 场景融入<span>工作流迁移</span></div><div><input class="rv-score-input" type="number" min="0" max="10" data-dim="B" value="' + (rev.overall.B !== undefined ? rev.overall.B : '') + '" placeholder="-" /><span class="rv-score-max">/10</span></div></div>' +
+            '<div class="rv-score-item"><div class="rv-score-label">C 绩效改善<span>业务结果</span></div><div><input class="rv-score-input" type="number" min="0" max="10" data-dim="C" value="' + (rev.overall.C !== undefined ? rev.overall.C : '') + '" placeholder="-" /><span class="rv-score-max">/10</span></div></div>' +
           '</div>' +
-          '<div class="rv-feedback"><textarea class="in rv-fb-textarea" placeholder="评语（可选）：这位学员在行为改变、场景融入、绩效改善方面的亮点与建议…">' + esc(rev.feedback || '') + '</textarea></div>' +
-          '<button class="btn btn-ghost btn-sm" data-ai="1" style="margin-top:10px">' + AL.icon('ai',{size:14,cls:'al-ic'}) + ' AI 建议（基于打卡流）</button>' +
-          '<button class="rv-save-btn ' + (rev.saved ? 'saved' : '') + '">' + (rev.saved ? AL.icon('check',{size:14,cls:'al-ic'}) + ' 已保存' : '保存评分') + '</button>' +
-        '</div>'; // score area
+          '<div class="rv-feedback"><textarea class="in rv-ov-textarea" placeholder="总评评语（可选）：这位学员在行为改变、场景融入、绩效改善方面的亮点与建议…">' + esc(rev.overall.feedback || '') + '</textarea></div></div>';
+
+        html += '<div class="rv-gate-msg" style="display:none;color:var(--danger);font-size:12px;margin-top:8px"></div>';
+        html += '<button class="btn btn-ghost btn-sm" data-ai="1" style="margin-top:10px">' + AL.icon('ai',{size:14,cls:'al-ic'}) + ' AI 建议（基于迁移记录）</button>' +
+          '<button class="rv-save-btn ' + (rev.saved ? 'saved' : '') + '">' + (rev.saved ? AL.icon('check',{size:14,cls:'al-ic'}) + ' 已保存' : '保存复盘') + '</button>';
+        html += '</div>'; // score area
 
         html += '</div>'; // card
       });
       container.innerHTML = html;
 
-      // 绑定保存按钮 / AI 建议事件
+      // 绑定事件
       container.querySelectorAll('.rv-score-area').forEach(function (area) {
         var name = area.dataset.student;
         var saveBtn = area.querySelector('.rv-save-btn');
         var aiBtn = area.querySelector('[data-ai]');
-        if (saveBtn) saveBtn.onclick = function () {
-          var inputs = area.querySelectorAll('.rv-score-input');
-          var r = { A: '', B: '', C: '', feedback: '', saved: true, reviewer: '' };
-          inputs.forEach(function (inp) { r[inp.dataset.dim] = inp.value; });
-          r.feedback = area.querySelector('.rv-fb-textarea').value;
-          r.reviewer = (document.getElementById('rv-role').value || '') + ' / ' + (document.getElementById('rv-name').value || '');
-          RV.reviews[name] = r;
-          RV.saveReviews();
-          saveBtn.innerHTML = AL.icon('check',{size:14,cls:'al-ic'}) + ' 已保存';
-          saveBtn.classList.add('saved');
-          RV.renderSummary();
-        };
+        if (saveBtn) saveBtn.onclick = function () { rvSaveReview(name, area, saveBtn); };
         if (aiBtn) aiBtn.onclick = function () { rvAiSuggest(name, area); };
       });
     },
@@ -2437,8 +2367,8 @@
       }
 
       var rows = RV.students.map(function (st) {
-        var r = RV.reviews[st.name] || {};
-        return { name: st.name, a: parseFloat(r.A) || 0, b: parseFloat(r.B) || 0, c: parseFloat(r.C) || 0 };
+        var r = RV.reviews[st.name] || {}; var ov = r.overall || {};
+        return { name: st.name, a: parseFloat(ov.A) || 0, b: parseFloat(ov.B) || 0, c: parseFloat(ov.C) || 0 };
       }).filter(function (r) { return r.a > 0 || r.b > 0 || r.c > 0; });
 
       var html = '<div style="margin-bottom:16px;font-size:14px;font-weight:700;color:var(--ink)">' +
@@ -2508,35 +2438,31 @@
           desc: ec.earnedWhat || '(未填写)', hint: '绩效/业绩价值' }
       ];
 
-      // 从打卡数据中收集信号
-      var allChecks = [];
-      RV.students.forEach(function (st) { (st.checkins || []).forEach(function (ck) { allChecks.push(ck); }); });
-      var identityConfirmed = allChecks.filter(function (c) { return c.confirmedIdentity; }).length;
-      var triedOrPersisting = allChecks.filter(function (c) { return c.status === 'tried' || c.status === 'persisting'; }).length;
-      var notesWithContent = allChecks.filter(function (c) { return c.note && c.note.trim(); }).length;
-      var uniqueBehaviors = {}; allChecks.forEach(function (c) { uniqueBehaviors[c.behaviorId] = true; });
-      var behaviorCount = Object.keys(uniqueBehaviors).length;
+      // 从提交数据中收集信号（schema@5：subs 替代 checkins）
+      var allSubs = gatherAllSubs(RV.currentCourse);
+      var fbMap2 = {}; flatBehaviors(course).forEach(function (o) { fbMap2[o.behaviorId] = o; });
+      var distinct = {}; allSubs.forEach(function (s) { distinct[s.behaviorId] = 1; });
+      var behaviorCount = Object.keys(distinct).length;
+      var resultCounts = allSubs.filter(function (s) { return s.resultImpact && s.resultImpact.trim(); }).length;
+      var futureCounts = allSubs.filter(function (s) { return s.futureApplication && s.futureApplication.trim(); }).length;
+      var keyDone = flatBehaviors(course).filter(function (o) { return o.kind === 'key' && distinct[o.behaviorId]; }).length;
+      var scoredCount = Object.keys(RV.reviews).filter(function (k) { var r = RV.reviews[k]; var o = r.overall || {}; return o.A || o.B || o.C; }).length;
 
       var evidenceMap = {
         spentWhat: [{ text: '课程主题已配置：' + (course.theme || '-'), ok: !!course.theme }],
         changedWhat: [
           { text: '已覆盖行为数：' + behaviorCount + ' 条', ok: behaviorCount >= 3 },
-          { text: '总打卡次数：' + allChecks.length + ' 次', ok: allChecks.length >= 3 },
-          { text: '有效打卡（试了一步/在坚持）：' + triedOrPersisting + ' 次', ok: triedOrPersisting >= 2 },
-          { text: '身份确认次数：' + identityConfirmed + ' 次', ok: identityConfirmed >= 1 }
+          { text: '学员提交总数：' + allSubs.length + ' 条', ok: allSubs.length >= 3 },
+          { text: '关键行为完成：' + keyDone + ' 条', ok: keyDone >= 1 }
         ],
         producedWhat: [
-          { text: '有内容记录的打卡：' + notesWithContent + ' 次', ok: notesWithContent >= 2 },
-          { text: '已评分数员：' + Object.keys(RV.reviews).filter(function (k) { var r = RV.reviews[k]; return r.A || r.B || r.C; }).length + ' 人', ok: false }
+          { text: '有结果记录的提交：' + resultCounts + ' 条', ok: resultCounts >= 2 },
+          { text: '已评分数员：' + scoredCount + ' 人', ok: false }
         ],
         earnedWhat: [
-          { text: 'C 维度（绩效改善）平均分：' + (function () {
-              var scored = Object.keys(RV.reviews).map(function (k) { return parseFloat(RV.reviews[k].C) || 0; }).filter(function (v) { return v > 0; });
-              return scored.length ? (scored.reduce(function (a, b) { return a + b; }, 0) / scored.length).toFixed(1) : '-';
-            })(), ok: false }
+          { text: 'C 维度（绩效改善）平均分：' + (function () { var sc = Object.keys(RV.reviews).map(function (k) { return parseFloat((RV.reviews[k].overall || {}).C) || 0; }).filter(function (v) { return v > 0; }); return sc.length ? (sc.reduce(function (a, b) { return a + b; }, 0) / sc.length).toFixed(1) : '-'; })(), ok: false }
         ]
       };
-
       var html = '<div style="margin-bottom:16px;font-size:14px;font-weight:700;color:var(--ink);display:flex;align-items:center">' +
         AL.icon('path',{size:18,cls:'al-ic'}) + ' 培训价值证据链校验</div>';
 
@@ -2567,13 +2493,13 @@
 
       // 贯通度总结
       var filledSteps = steps.filter(function (s) { return ec[s.key] && ec[s.key].trim(); }).length;
-      var overallStatus = (filledSteps === 4 && identityConfirmed > 0) ? '基本贯通' :
+      var overallStatus = (filledSteps === 4 && scoredCount > 0) ? '基本贯通' :
                           (filledSteps >= 2 ? '部分可汇报' : '需继续收集');
       html += '<div style="background:var(--surface);border:1.5px solid var(--line);border-radius:13px;padding:18px 20px;margin-top:10px;text-align:center">' +
         '<div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px">' + AL.icon('target',{size:16,cls:'al-ic'}) + ' 证据链总体状态：<b style="color:' +
         (overallStatus === '基本贯通' ? 'var(--success)' : (overallStatus === '部分可汇报' ? '#f57c00' : 'var(--ink-3)')) + '">' +
         overallStatus + '</b></div>' +
-        '<div style="font-size:12px;color:var(--ink-3)">证据链四步填写 ' + filledSteps + '/4 · 学员打卡 ' + allChecks.length + ' 条 · 身份确认 ' + identityConfirmed + ' 次 · 已评分 ' + Object.keys(RV.reviews).filter(function (k) { var r = RV.reviews[k]; return r.A || r.B || r.C; }).length + ' 人</div>' +
+        '<div style="font-size:12px;color:var(--ink-3)">证据链四步填写 ' + filledSteps + '/4 · 学员提交 ' + allSubs.length + ' 条 · 已评分 ' + scoredCount + ' 人</div>' +
       '</div>';
 
       c.innerHTML = html;
@@ -2626,7 +2552,7 @@
       var sku = RP.sku;
       var course = ALV2.store.get(sku, 'config', null);
       var students = gatherStudents(sku);
-      var allChecks = gatherAllChecks(sku);
+      var allSubs = gatherAllSubs(sku);
       var reviews = ALV2.store.get(sku, 'reviews', {});
       var v = document.getElementById('rp-view');
 
@@ -2635,28 +2561,28 @@
         '<div class="rp-meta"><span>主题：<b>' + esc(course.theme) + '</b></span>' +
         (course.needs ? '<span>目标：<b>' + esc(course.needs) + '</b></span>' : '') +
         '<span>学员：<b>' + students.length + '</b> 人</span>' +
-        '<span>打卡：<b>' + allChecks.length + '</b> 次</span></div></div>' +
+        '<span>提交：<b>' + allSubs.length + '</b> 次</span></div></div>' +
         '<div class="rp-actions">' +
         '<button class="btn btn-ghost btn-sm" id="rp-copy">' + AL.icon('copy',{size:16,cls:'al-ic'}) + ' 复制文字版</button>' +
         '<button class="btn btn-primary btn-sm" id="rp-export">' + AL.icon('export',{size:16,cls:'al-ic'}) + ' 导出汇报件</button>' +
         '</div></div>';
 
       var sec1 = RP.secHead('1', '框架 · 课程设计闭环', '') + RP.renderFramework(course) + '</div>';
-      var sec2 = RP.secHead('2', '流程 · 学习落地情况', '') + RP.renderProcess(course, students, allChecks, reviews) + '</div>';
+      var sec2 = RP.secHead('2', '流程 · 学习落地情况', '') + RP.renderProcess(course, students, allSubs, reviews) + '</div>';
 
-      var synth = RP.synthesize(course, students, allChecks, reviews);
+      var synth = RP.synthesize(course, students, allSubs, reviews);
       var sec3 = RP.secHead('3', '亮点 · 自动沉淀的 playbook', 'AI 自动提炼') +
         '<div class="rp-narr">' + synth.narrative + '</div>' +
         (synth.playbook.length ? synth.playbook.map(function (p) {
           return '<div class="rp-play"><span class="tag">' + esc(p.tag) + '</span><div><div class="pb-b">' + esc(p.title) + '</div><div class="pb-t">' + esc(p.text) + '</div><div class="pb-src">' + esc(p.src) + '</div></div></div>';
         }).join('') : '<div class="rp-empty">暂无可提炼的亮点。鼓励学员多打卡、多记录，亮点会自动浮现。</div>') + '</div>';
 
-      var sec4 = RP.secHead('4', '逻辑 · 培训价值证据链', '') + RP.buildChainHTML(course, students, allChecks, reviews) + '</div>';
+      var sec4 = RP.secHead('4', '逻辑 · 培训价值证据链', '') + RP.buildChainHTML(course, students, allSubs, reviews) + '</div>';
 
       v.innerHTML = head + sec1 + sec2 + sec3 + sec4;
 
-      document.getElementById('rp-export').onclick = function () { RP.exportHTML(course, students, allChecks, reviews, synth); };
-      document.getElementById('rp-copy').onclick = function () { RP.copyText(course, students, allChecks, reviews, synth); };
+      document.getElementById('rp-export').onclick = function () { RP.exportHTML(course, students, allSubs, reviews, synth); };
+      document.getElementById('rp-copy').onclick = function () { RP.copyText(course, students, allSubs, reviews, synth); };
     },
     secHead: function (n, title, ai) {
       var cat = {1:'框架 · Framework',2:'流程 · Flow',3:'亮点 · Highlights',4:'逻辑 · Logic'}[n] || '';
@@ -2673,111 +2599,119 @@
       return scs.map(function (sc, i) {
         var html = '<div class="rp-sc"><div class="rp-sc-t"><span class="rp-sec-n" style="width:24px;height:24px;font-size:12px">' + (i + 1) + '</span>' + esc(sc.name) + '</div>';
         if (sc.challenge) html += '<div class="rp-sc-ch">挑战：' + esc(sc.challenge) + '</div>';
-        (sc.tasks || []).forEach(function (tk) {
-          html += '<div class="rp-task"><div style="flex:1;min-width:0"><div class="tk-n">' + esc(tk.name) + '</div>';
-          if (tk.benefit) html += '<div style="font-size:12px;color:var(--ink-2);margin-top:3px">' + esc(tk.benefit) + '</div>';
-          var chips = '';
-          (tk.methods || []).forEach(function (m) { chips += '<span class="rp-chip m">' + esc(m.name) + '</span>'; });
-          (tk.behaviors || []).forEach(function (b) { chips += '<span class="rp-chip b">' + esc(b.desc) + '</span>'; });
-          if (chips) html += '<div class="rp-chips">' + chips + '</div>';
+        (sc.behaviors || []).forEach(function (b) {
+          html += '<div class="rp-task"><div style="flex:1;min-width:0"><div class="tk-n">' + esc(b.action || '（未命名行为）') + (b.kind === 'key' ? ' <span class="tag">关键</span>' : '') + '</div>';
+          var sub = [];
+          if (b.scene) sub.push('场景：' + esc(b.scene));
+          if (b.challenge) sub.push('挑战：' + esc(b.challenge));
+          if (b.expectedResult) sub.push('预期结果：' + esc(b.expectedResult));
+          if (sub.length) html += '<div style="font-size:12px;color:var(--ink-2);margin-top:3px">' + sub.join('　') + '</div>';
           html += '</div></div>';
         });
+        var chips = '';
+        (sc.methods || []).forEach(function (m) { chips += '<span class="rp-chip m">' + esc(m.name) + '</span>'; });
+        if (chips) html += '<div class="rp-chips">' + chips + '</div>';
         if (sc.metric && (sc.metric.name || sc.metric.target)) {
-          html += '<div class="rp-metric"><span class="k">场景指标</span>：<b>' + esc(sc.metric.name || '未命名') + '</b>' +
-            (sc.metric.target ? ' · 目标 ' + esc(sc.metric.target) : '') +
-            (sc.metric.caliber ? ' · 口径 ' + esc(sc.metric.caliber) : '') + '</div>';
+          html += '<div class="rp-metric"><span class="k">场景指标</span>：<b>' + esc(sc.metric.name || '未命名') + '</b>'
+            + (sc.metric.target ? ' · 目标 ' + esc(sc.metric.target) : '')
+            + (sc.metric.caliber ? ' · 口径 ' + esc(sc.metric.caliber) : '') + '</div>';
         }
         html += '</div>';
         return html;
       }).join('');
     },
-    renderProcess: function (course, students, allChecks, reviews) {
-      var total = allChecks.length;
-      var persist = allChecks.filter(function (c) { return c.status === 'persisting'; }).length;
-      var tried = allChecks.filter(function (c) { return c.status === 'tried'; }).length;
-      var idC = allChecks.filter(function (c) { return c.identitySignal; }).length;
-      var behMap = {}; flatBehaviors(course).forEach(function (o) { behMap[o.b.id] = 1; });
-      var covered = {}; allChecks.forEach(function (c) { if (behMap[c.behaviorId]) covered[c.behaviorId] = 1; });
-      var coveredN = Object.keys(covered).length; var totalB = Object.keys(behMap).length;
-      var rate = (persist + tried) ? Math.round(persist / (persist + tried) * 100) : 0;
-      var days = {}; allChecks.forEach(function (c) { var d = new Date(c.ts); days[d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()] = 1; });
+
+    renderProcess: function (course, students, allSubs, reviews) {
+      var total = allSubs.length;
+      var fbMap = {}; flatBehaviors(course).forEach(function (o) { fbMap[o.behaviorId] = o; });
+      var covered = {}; allSubs.forEach(function (c) { if (fbMap[c.behaviorId]) covered[c.behaviorId] = 1; });
+      var coveredN = Object.keys(covered).length; var totalB = Object.keys(fbMap).length;
+      var keyN = flatBehaviors(course).filter(function (o) { return o.kind === 'key'; }).length;
+      var resultN = allSubs.filter(function (c) { return c.resultImpact && c.resultImpact.trim(); }).length;
+      var days = {}; allSubs.forEach(function (c) { var d = new Date(c.ts); days[d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()] = 1; });
       var span = Object.keys(days).length;
 
       var kpis = '<div class="rp-kpis">' +
         RP.kpi(students.length, '参与学员') +
-        RP.kpi(total, '累计打卡') +
+        RP.kpi(total, '提交记录') +
         RP.kpi(coveredN + '/' + totalB, '覆盖行为', coveredN >= totalB && totalB > 0) +
-        RP.kpi(rate + '%', '坚持率', rate >= 50) +
-        RP.kpi(idC, '身份认同确认') +
+        RP.kpi(resultN, '有结果记录', resultN >= 3) +
         RP.kpi(span, '活跃天数') + '</div>';
 
       var stuHtml = '<div class="rp-sub-t">学员参与概览</div><div class="rp-stu">';
       students.forEach(function (s) {
-        var ck = s.checkins || [];
-        var p = ck.filter(function (c) { return c.status === 'persisting'; }).length;
-        var t = ck.filter(function (c) { return c.status === 'tried' || c.status === 'persisting'; }).length;
-        var r = reviews[s.name] || {};
-        var sc = [r.A, r.B, r.C].filter(function (x) { return x !== '' && x != null; });
+        var subs = s.subs || [];
+        var comp = ALV2.completion(course, subs);
+        var r = reviews[s.name] || {}; var ov = r.overall || {};
+        var sc = [ov.A, ov.B, ov.C].filter(function (x) { return x !== '' && x != null; });
         var avg = sc.length ? (sc.reduce(function (a, b) { return a + parseFloat(b); }, 0) / sc.length).toFixed(1) : '-';
         stuHtml += '<div class="rp-stu-c"><div class="nm"><div class="av">' + esc((s.name || '?').slice(0, 1)) + '</div>' + esc(s.name) + '</div>' +
-          '<div class="row"><span>打卡</span><b>' + ck.length + ' 次</b></div>' +
-          '<div class="row"><span>在坚持</span><b>' + p + ' 条</b></div>' +
-          '<div class="row"><span>有效打卡</span><b>' + t + ' 条</b></div>' +
-          '<div class="rp-score-mini">三维均分：' + avg + '/10</div></div>';
+          '<div class="row"><span>提交</span><b>' + subs.length + ' 条</b></div>' +
+          '<div class="row"><span>行为完成</span><b>' + comp.done + '/' + comp.total + '</b></div>' +
+          '<div class="row"><span>三维度均分</span><b>' + avg + '/10</b></div></div>';
       });
       stuHtml += '</div>';
 
       var tl;
       if (total) {
-        var sorted = allChecks.slice().sort(function (a, b) { return b.ts - a.ts; }).slice(0, 8);
-        var behName = {}; flatBehaviors(course).forEach(function (o) { behName[o.b.id] = o.b.desc; });
-        tl = '<div class="rp-sub-t">最近打卡动态</div><div style="background:var(--surface-2);border:1.5px solid var(--line);border-radius:13px;padding:4px 14px">';
+        var sorted = allSubs.slice().sort(function (a, b) { return b.ts - a.ts; }).slice(0, 8);
+        tl = '<div class="rp-sub-t">最近迁移动态</div><div style="background:var(--surface-2);border:1.5px solid var(--line);border-radius:13px;padding:4px 14px">';
         tl += sorted.map(function (c) {
-          var dot = c.status === 'persisting' ? 'var(--success)' : (c.status === 'tried' ? 'var(--primary)' : 'var(--ink-3)');
+          var o = fbMap[c.behaviorId];
+          var dot = (o && o.kind === 'key') ? 'var(--primary)' : 'var(--success)';
+          var label = (o ? (o.kind === 'key' ? '关键·' : '微·') : '') + (c.action || (o ? o.b.action : '行为'));
           return '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line-2);font-size:12.5px;align-items:center">' +
             '<div style="width:9px;height:9px;border-radius:50%;background:' + dot + ';flex:0 0 9px"></div>' +
-            '<div style="flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(behName[c.behaviorId] || '行为') + '</div>' +
-            '<div style="color:var(--ink-3);white-space:nowrap">' + esc((c.studentName || '') + ' · ' + statusOf(c.status)) + '</div></div>';
+            '<div style="flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(label) + '</div>' +
+            '<div style="color:var(--ink-3);white-space:nowrap">' + esc((c.studentName || '')) + (c.resultImpact ? ' · 有结果' : '') + '</div></div>';
         }).join('');
         tl += '</div>';
-      } else { tl = '<div class="rp-empty">还没有打卡记录。</div>'; }
+      } else { tl = '<div class="rp-empty">还没有迁移记录。</div>'; }
 
       return kpis + stuHtml + tl;
     },
-    synthesize: function (course, students, allChecks, reviews) {
-      var total = allChecks.length;
-      var persist = allChecks.filter(function (c) { return c.status === 'persisting'; }).length;
-      var idC = allChecks.filter(function (c) { return c.identitySignal; }).length;
-      var rate = (persist + (allChecks.filter(function (c) { return c.status === 'tried'; }).length)) ? Math.round(persist / (persist + allChecks.filter(function (c) { return c.status === 'tried'; }).length)) : 0;
-      var scoredN = Object.keys(reviews).filter(function (k) { var r = reviews[k]; return r.A || r.B || r.C; }).length;
-      var verdict = RP.chainVerdict(course, allChecks, idC, reviews);
 
-      var narrative = '本次「<b>' + esc(course.theme) + '</b>」培训共 <b>' + students.length + '</b> 名学员参与，累计完成 <b>' + total + '</b> 次微打卡；其中 <b>' + persist + '</b> 次已稳定融入日常（坚持率 <b>' + rate + '%</b>），<b>' + idC + '</b> 次打卡伴随身份认同确认。' +
+    synthesize: function (course, students, allSubs, reviews) {
+      var total = allSubs.length;
+      var fbMap = {}; flatBehaviors(course).forEach(function (o) { fbMap[o.behaviorId] = o; });
+      var distinct = {}; allSubs.forEach(function (c) { distinct[c.behaviorId] = 1; });
+      var covered = Object.keys(distinct).length;
+      var totalB = Object.keys(fbMap).length;
+      var resultN = allSubs.filter(function (c) { return c.resultImpact && c.resultImpact.trim(); }).length;
+      var keyDone = flatBehaviors(course).filter(function (o) { return o.kind === 'key' && distinct[o.behaviorId]; }).length;
+      var scoredN = Object.keys(reviews).filter(function (k) { var r = reviews[k]; var o = r.overall || {}; return o.A || o.B || o.C; }).length;
+      var verdict = RP.chainVerdict(course, allSubs, reviews);
+
+      var narrative = '本次「<b>' + esc(course.theme) + '</b>」培训共 <b>' + students.length + '</b> 名学员参与，累计完成 <b>' + total + '</b> 次学习迁移（覆盖 ' + covered + '/' + totalB + ' 条高绩效行为，其中关键行为完成 ' + keyDone + ' 条）；其中 <b>' + resultN + '</b> 次记录了明确的结果与影响。' +
         (scoredN ? '复盘评价已完成 <b>' + scoredN + '</b> 人，' : '目前尚未完成复盘评分，') +
-        '培训价值证据链整体处于「<b>' + verdict + '</b>」状态。下表为系统自动从打卡中提炼的亮点，可直接作为内部 playbook 与经验素材。';
+        '培训价值证据链整体处于「<b>' + verdict + '</b>」状态。下表为系统自动从迁移记录中提炼的亮点，可直接作为内部 playbook 与经验素材。';
 
       var plays = [];
-      var behMap = {}; flatBehaviors(course).forEach(function (o) { behMap[o.b.id] = o; });
-      var byB = {}; allChecks.forEach(function (c) { if (c.status === 'persisting') byB[c.behaviorId] = (byB[c.behaviorId] || 0) + 1; });
-      var topB = Object.keys(byB).map(function (id) { return { id: id, n: byB[id] }; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 3);
-      topB.forEach(function (t) { var o = behMap[t.id]; if (!o) return; plays.push({ tag: '稳定行为', title: '「' + o.b.desc + '」已稳定融入日常', text: o.scene.name + ' → ' + o.task.name + '：已有 ' + t.n + ' 次打卡标记为「在坚持」，说明该行为正成为习惯。', src: '场景：' + o.scene.name }); });
-      allChecks.filter(function (c) { return c.identitySignal; }).slice(0, 2).forEach(function (c) { var o = behMap[c.behaviorId]; plays.push({ tag: '身份认同', title: '学员确认身份认同', text: (c.note && c.note.trim() ? '“' + c.note.trim() + '”' : '该学员在「' + (o ? o.b.desc : '行为') + '」打卡时确认了身份认同。'), src: '来自 ' + (c.studentName || '学员') }); });
-      allChecks.filter(function (c) { return c.note && c.note.trim(); }).slice(0, 3).forEach(function (c) { var o = behMap[c.behaviorId]; plays.push({ tag: '业务实证', title: '一次有实证的实践', text: '“' + c.note.trim() + '”', src: (o ? o.scene.name : '') + (c.studentName ? ' · ' + c.studentName : '') }); });
-      var scored = students.map(function (s) { var r = reviews[s.name] || {}; var a = parseFloat(r.A) || 0, b = parseFloat(r.B) || 0, c2 = parseFloat(r.C) || 0; return { name: s.name, avg: (a + b + c2) / 3, has: (a || b || c2) }; }).filter(function (x) { return x.has && x.avg >= 7; });
+      allSubs.filter(function (c) { return c.resultImpact && c.resultImpact.trim(); }).slice(0, 3).forEach(function (c) {
+        var o = fbMap[c.behaviorId];
+        plays.push({ tag: '业务实证', title: (o ? (o.kind === 'key' ? '关键行为带来结果' : '微行为带来结果') : '一次有结果的实践'), text: '“' + c.resultImpact.trim() + '”', src: (o ? (o.kind === 'key' ? '关键·' : '微·') + (o.b.action || '') : '') + (c.studentName ? ' · ' + c.studentName : '') });
+      });
+      allSubs.filter(function (c) { return c.futureApplication && c.futureApplication.trim(); }).slice(0, 2).forEach(function (c) {
+        var o = fbMap[c.behaviorId];
+        plays.push({ tag: '未来应用', title: '学员规划下一步应用', text: '“' + c.futureApplication.trim() + '”', src: '来自 ' + (c.studentName || '学员') });
+      });
+      var scored = students.map(function (s) { var r = reviews[s.name] || {}; var o = r.overall || {}; var a = parseFloat(o.A) || 0, b = parseFloat(o.B) || 0, c2 = parseFloat(o.C) || 0; return { name: s.name, avg: (a + b + c2) / 3, has: (a || b || c2) }; }).filter(function (x) { return x.has && x.avg >= 7; });
       scored.slice(0, 2).forEach(function (x) { plays.push({ tag: '标杆学员', title: x.name + ' 表现突出', text: '三维度平均 ' + x.avg.toFixed(1) + '/10，可作为内部经验分享与带教对象。', src: '复盘评价' }); });
 
       if (plays.length > 8) plays = plays.slice(0, 8);
       return { narrative: narrative, playbook: plays };
     },
-    chainVerdict: function (course, allChecks, idC, reviews) {
+
+    chainVerdict: function (course, allSubs, reviews) {
       var ec = course.evidenceChain || {};
       var filled = ['spentWhat', 'changedWhat', 'producedWhat', 'earnedWhat'].filter(function (k) { return ec[k] && ec[k].trim(); }).length;
-      var scored = Object.keys(reviews).filter(function (k) { var r = reviews[k]; return r.A || r.B || r.C; }).length;
-      if (filled === 4 && idC > 0 && scored > 0) return '基本贯通，可对外汇报';
+      var scored = Object.keys(reviews).filter(function (k) { var r = reviews[k]; var o = r.overall || {}; return o.A || o.B || o.C; }).length;
+      if (filled === 4 && scored > 0) return '基本贯通，可对外汇报';
       if (filled >= 2) return '部分可汇报';
       return '需继续收集';
     },
-    buildChainHTML: function (course, students, allChecks, reviews) {
+
+    buildChainHTML: function (course, students, allSubs, reviews) {
       var ec = course.evidenceChain;
       if (!ec) return '<div class="rp-empty">请先在配置构建器中填写培训价值证据链。</div>';
       var steps = [
@@ -2786,28 +2720,28 @@
         { key: 'producedWhat', label: '③ 产出了什么', desc: ec.producedWhat || '(未填写)' },
         { key: 'earnedWhat', label: '④ 贡献了什么', desc: ec.earnedWhat || '(未填写)' }
       ];
-      var idC = allChecks.filter(function (c) { return c.identitySignal; }).length;
-      var triedOrPersist = allChecks.filter(function (c) { return c.status === 'tried' || c.status === 'persisting'; }).length;
-      var notes = allChecks.filter(function (c) { return c.note && c.note.trim(); }).length;
-      var behMap = {}; flatBehaviors(course).forEach(function (o) { behMap[o.b.id] = 1; });
-      var covered = {}; allChecks.forEach(function (c) { if (behMap[c.behaviorId]) covered[c.behaviorId] = 1; });
-      var behaviorCount = Object.keys(covered).length;
-      var scoredCount = Object.keys(reviews).filter(function (k) { var r = reviews[k]; return r.A || r.B || r.C; }).length;
+      var idC = allSubs.filter(function (c) { return c.futureApplication && c.futureApplication.trim(); }).length;
+      var resultN = allSubs.filter(function (c) { return c.resultImpact && c.resultImpact.trim(); }).length;
+      var fbMapB = {}; flatBehaviors(course).forEach(function (o) { fbMapB[o.behaviorId] = 1; });
+      var distB = {}; allSubs.forEach(function (c) { if (fbMapB[c.behaviorId]) distB[c.behaviorId] = 1; });
+      var behaviorCount = Object.keys(distB).length;
+      var scoredCount = Object.keys(reviews).filter(function (k) { var r = reviews[k]; var o = r.overall || {}; return o.A || o.B || o.C; }).length;
       var evidenceMap = {
         spentWhat: [{ text: '课程主题已配置：' + (course.theme || '-'), ok: !!course.theme }],
         changedWhat: [
           { text: '已覆盖行为数：' + behaviorCount + ' 条', ok: behaviorCount >= 3 },
-          { text: '有效打卡：' + triedOrPersist + ' 次', ok: triedOrPersist >= 2 },
-          { text: '身份确认：' + idC + ' 次', ok: idC >= 1 }
+          { text: '学员提交总数：' + allSubs.length + ' 条', ok: allSubs.length >= 3 },
+          { text: '有结果记录的提交：' + resultN + ' 次', ok: resultN >= 2 }
         ],
         producedWhat: [
-          { text: '有内容记录的打卡：' + notes + ' 次', ok: notes >= 2 },
+          { text: '关键行为完成：' + (function () { var d = {}; flatBehaviors(course).forEach(function (o) { if (o.kind === 'key') d[o.behaviorId] = 1; }); var kd = allSubs.filter(function (c) { return d[c.behaviorId]; }).length; return kd; })() + ' 条', ok: true },
           { text: '已评分数员：' + scoredCount + ' 人', ok: false }
         ],
         earnedWhat: [
-          { text: 'C 维度（绩效改善）平均分：' + (function () { var sc = Object.keys(reviews).map(function (k) { return parseFloat(reviews[k].C) || 0; }).filter(function (v) { return v > 0; }); return sc.length ? (sc.reduce(function (a, b) { return a + b; }, 0) / sc.length).toFixed(1) : '-'; })(), ok: false }
+          { text: 'C 维度（绩效改善）平均分：' + (function () { var sc = Object.keys(reviews).map(function (k) { return parseFloat((reviews[k].overall || {}).C) || 0; }).filter(function (v) { return v > 0; }); return sc.length ? (sc.reduce(function (a, b) { return a + b; }, 0) / sc.length).toFixed(1) : '-'; })(), ok: false }
         ]
       };
+
       var html = '';
       steps.forEach(function (step, si) {
         var evs = evidenceMap[step.key] || [];
@@ -2820,11 +2754,11 @@
         html += '<span class="chain-status ' + statusCls + '">' + statusText + '</span></div></div></div>';
       });
       var filled = ['spentWhat', 'changedWhat', 'producedWhat', 'earnedWhat'].filter(function (k) { return ec[k] && ec[k].trim(); }).length;
-      var verdict = RP.chainVerdict(course, allChecks, idC, reviews);
-      html += '<div style="background:var(--surface);border:1.5px solid var(--line);border-radius:13px;padding:18px 20px;margin-top:10px;text-align:center"><div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px">' + AL.icon('target',{size:16,cls:'al-ic'}) + ' 证据链总体状态：<b style="color:' + (verdict.indexOf('基本贯通') >= 0 ? 'var(--success)' : (verdict === '部分可汇报' ? '#f57c00' : 'var(--ink-3)')) + '">' + verdict + '</b></div><div style="font-size:12px;color:var(--ink-3)">证据链四步填写 ' + filled + '/4 · 学员打卡 ' + allChecks.length + ' 条 · 身份确认 ' + idC + ' 次 · 已评分 ' + scoredCount + ' 人</div></div>';
+      var verdict = RP.chainVerdict(course, allSubs, idC, reviews);
+      html += '<div style="background:var(--surface);border:1.5px solid var(--line);border-radius:13px;padding:18px 20px;margin-top:10px;text-align:center"><div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px">' + AL.icon('target',{size:16,cls:'al-ic'}) + ' 证据链总体状态：<b style="color:' + (verdict.indexOf('基本贯通') >= 0 ? 'var(--success)' : (verdict === '部分可汇报' ? '#f57c00' : 'var(--ink-3)')) + '">' + verdict + '</b></div><div style="font-size:12px;color:var(--ink-3)">证据链四步填写 ' + filled + '/4 · 学员提交 ' + allSubs.length + ' 条 · 未来应用规划 ' + idC + ' 次 · 已评分 ' + scoredCount + ' 人</div></div>';
       return html;
     },
-    exportHTML: function (course, students, allChecks, reviews, synth) {
+    exportHTML: function (course, students, allSubs, reviews, synth) {
       var conte = document.getElementById('rp-view').innerHTML;
       var doc = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>成果汇报 · ' + esc(course.theme) + '</title>' +
         '<style>body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#1a2233;background:#fff;margin:0;padding:32px 36px}' +
@@ -2858,36 +2792,36 @@
       if (!w) { toast('浏览器拦截了新窗口，请允许弹出窗口后重试', 'err'); return; }
       w.document.open(); w.document.write(doc); w.document.close();
     },
-    copyText: function (course, students, allChecks, reviews, synth) {
-      var total = allChecks.length;
-      var persist = allChecks.filter(function (c) { return c.status === 'persisting'; }).length;
-      var tried = allChecks.filter(function (c) { return c.status === 'tried'; }).length;
-      var rate = (persist + tried) ? Math.round(persist / (persist + tried) * 100) : 0;
-      var bm = {}; flatBehaviors(course).forEach(function (o) { bm[o.b.id] = 1; });
-      var cov = {}; allChecks.forEach(function (c) { if (bm[c.behaviorId]) cov[c.behaviorId] = 1; });
+    copyText: function (course, students, allSubs, reviews, synth) {
+      var total = allSubs.length;
+      var bm = {}; flatBehaviors(course).forEach(function (o) { bm[o.behaviorId] = o; });
+      var cov = {}; allSubs.forEach(function (c) { if (bm[c.behaviorId]) cov[c.behaviorId] = 1; });
+      var keyDone = flatBehaviors(course).filter(function (o) { return o.kind === 'key' && cov[o.behaviorId]; }).length;
       var lines = [];
       lines.push('# 培训成果汇报 · ' + course.client + ' · ' + course.theme);
       lines.push('');
-      lines.push('客户：' + course.client + ' ｜ 班次：' + course.cohort + ' ｜ 学员：' + students.length + ' 人 ｜ 打卡：' + total + ' 次 ｜ 坚持率：' + rate + '%');
+      lines.push('客户：' + course.client + ' ｜ 班次：' + course.cohort + ' ｜ 学员：' + students.length + ' 人 ｜ 提交：' + total + ' 次 ｜ 覆盖行为：' + Object.keys(cov).length + '/' + Object.keys(bm).length + '（关键 ' + keyDone + '）');
       lines.push('');
       lines.push('## 一、框架（课程设计闭环）');
       (course.scenarios || []).forEach(function (sc, i) {
         lines.push((i + 1) + '. ' + sc.name + (sc.challenge ? '（挑战：' + sc.challenge + '）' : ''));
-        (sc.tasks || []).forEach(function (tk) {
-          var m = (tk.methods || []).map(function (x) { return x.name; }).join('、');
-          var b = (tk.behaviors || []).map(function (x) { return x.desc; }).join('、');
-          lines.push('   - ' + tk.name + (m ? ' ｜ 方法：' + m : '') + (b ? ' ｜ 行为：' + b : ''));
+        (sc.behaviors || []).forEach(function (b) {
+          var sub = [b.scene, b.challenge, b.expectedResult].filter(function (x) { return x; }).join(' / ');
+          lines.push('   - ' + (b.kind === 'key' ? '【关键】' : '') + (b.action || '行为') + (sub ? '（' + sub + '）' : ''));
         });
+        if (sc.methods && sc.methods.length) lines.push('   - 方法工具：' + sc.methods.map(function (m) { return m.name; }).join('、'));
         if (sc.metric && sc.metric.name) lines.push('   - 场景指标：' + sc.metric.name + (sc.metric.target ? '（目标 ' + sc.metric.target + '）' : ''));
       });
       lines.push('');
       lines.push('## 二、流程（学习落地）');
-      lines.push('累计打卡 ' + total + ' 次，覆盖行为 ' + Object.keys(cov).length + '/' + Object.keys(bm).length + '，坚持率 ' + rate + '%。');
+      lines.push('累计提交 ' + total + ' 次，覆盖行为 ' + Object.keys(cov).length + '/' + Object.keys(bm).length + '（关键行为完成 ' + keyDone + '）。');
       students.forEach(function (s) {
-        var ck = s.checkins || []; var p = ck.filter(function (c) { return c.status === 'persisting'; }).length;
-        var r = reviews[s.name] || {}; var sc = [r.A, r.B, r.C].filter(function (x) { return x !== '' && x != null; });
+        var subs = s.subs || [];
+        var comp = ALV2.completion(course, subs);
+        var r = reviews[s.name] || {}; var o = r.overall || {};
+        var sc = [o.A, o.B, o.C].filter(function (x) { return x !== '' && x != null; });
         var avg = sc.length ? (sc.reduce(function (a, b) { return a + parseFloat(b); }, 0) / sc.length).toFixed(1) : '-';
-        lines.push('   - ' + s.name + '：打卡 ' + ck.length + ' 次，在坚持 ' + p + ' 条，三维均分 ' + avg + '/10');
+        lines.push('   - ' + s.name + '：提交 ' + subs.length + ' 条，行为完成 ' + comp.done + '/' + comp.total + '，三维均分 ' + avg + '/10');
       });
       lines.push('');
       lines.push('## 三、亮点（自动提炼 playbook）');
@@ -2907,6 +2841,7 @@
         navigator.clipboard.writeText(text).then(function () { toast('已复制文字版，可粘贴到 PPT / Word', 'ok'); }, function () { RP._fallbackCopy(text); });
       } else { RP._fallbackCopy(text); }
     },
+
     _fallbackCopy: function (text) {
       var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
       try { document.execCommand('copy'); toast('已复制文字版', 'ok'); } catch (e) { toast('复制失败，请手动复制', 'err'); }
@@ -2919,39 +2854,79 @@
   // ============================================================
   //  P5 槽位②：复盘评价辅助建议（规则引擎）
   // ============================================================
-  function rvAiSuggest(name, area) {
-    var st = RV.students.filter(function (x) { return x.name === name; })[0];
+  function rvSaveReview(name, area, saveBtn) {
+    var st = (RV.students.filter(function (x) { return x.name === name; }))[0];
     if (!st) return;
-    var ck = st.checkins || [];
-    var persist = ck.filter(function (c) { return c.status === 'persisting'; }).length;
-    var tried = ck.filter(function (c) { return c.status === 'tried'; }).length;
-    var idC = ck.filter(function (c) { return c.identitySignal; }).length;
-    var notes = ck.filter(function (c) { return c.note && c.note.trim(); }).length;
-    var cfg = ALV2.store.get(RV.currentCourse, 'config', {});
-    var behMap = {}; flatBehaviors(cfg).forEach(function (o) { behMap[o.b.id] = o; });
-    var distinct = {}; ck.forEach(function (c) { distinct[c.behaviorId] = 1; }); var db = Object.keys(distinct).length;
-    var denom = (persist + tried) || 1;
-    var A = ck.length ? Math.max(1, Math.min(10, Math.round((persist / denom) * 7 + Math.min(idC, 2) * 1.5))) : 0;
-    var B = Math.min(10, Math.round(db * 1.2 + notes * 1.0));
-    var joined = ck.map(function (c) { return c.note || ''; }).join('');
-    var resultKw = /提升|降低|增长|减少|达成|完成|优化|改善|节约|提高|突破/.test(joined);
-    var C = Math.min(10, Math.round((A + B) / 2 * 0.9) + (resultKw ? 1 : 0));
-    area.querySelectorAll('.rv-score-input').forEach(function (inp) {
-      if (inp.dataset.dim === 'A') inp.value = A;
-      if (inp.dataset.dim === 'B') inp.value = B;
-      if (inp.dataset.dim === 'C') inp.value = C;
+    var subs = st.subs || [];
+    var course = ALV2.store.get(RV.currentCourse);
+    var keys = flatBehaviors(course).filter(function (o) { return o.kind === 'key'; });
+    function subFor(arr, bid) { for (var i = 0; i < (arr || []).length; i++) if (arr[i].behaviorId === bid) return arr[i]; return null; }
+
+    var keyFeedback = {};
+    var missing = [];
+    keys.forEach(function (o) {
+      var s = subFor(subs, o.behaviorId);
+      if (!s) return; // 该关键行为未提交，不强求复盘
+      var ta = area.querySelector('[data-kf="' + o.behaviorId + '"]');
+      var sel = area.querySelector('[data-rating="' + o.behaviorId + '"]');
+      var txt = ta ? ta.value.trim() : '';
+      var rating = sel ? sel.value : '';
+      if (!txt) missing.push(o.b.action || '关键行为');
+      keyFeedback[o.behaviorId] = { text: txt, rating: rating };
     });
-    var topB = (function () {
-      var byB = {}; ck.forEach(function (c) { if (c.status === 'persisting') byB[c.behaviorId] = (byB[c.behaviorId] || 0) + 1; });
-      var arr = Object.keys(byB).map(function (id) { return { id: id, n: byB[id] }; }).sort(function (a, b) { return b.n - a.n; });
-      return arr.length ? behMap[arr[0].id] : null;
-    })();
-    var fb = name + ' 在本课程中累计打卡 ' + ck.length + ' 次，其中 ' + persist + ' 次已形成稳定节奏';
-    if (idC) fb += '，并有 ' + idC + ' 次明确确认了身份认同';
-    if (topB) fb += '；在「' + topB.b.desc + '」上表现尤为突出';
-    fb += '。建议重点巩固已养成行为，并将其实践经验推广到团队协作场景。';
-    area.querySelector('.rv-fb-textarea').value = fb;
-    toast('已生成 AI 建议评分与评语，请确认后点「保存评分」', 'ok');
+    var microTa = area.querySelector('.rv-micro-textarea');
+    var microSummary = microTa ? microTa.value.trim() : '';
+    if (!microSummary) missing.push('微行为整体复盘');
+
+    var gate = area.querySelector('.rv-gate-msg');
+    if (missing.length) {
+      if (gate) { gate.style.display = 'block'; gate.textContent = '还需填写：' + missing.join('、'); }
+      return;
+    }
+    if (gate) gate.style.display = 'none';
+
+    var ov = {};
+    area.querySelectorAll('.rv-score-input').forEach(function (inp) { ov[inp.dataset.dim] = inp.value; });
+    ov.feedback = area.querySelector('.rv-ov-textarea') ? area.querySelector('.rv-ov-textarea').value : '';
+    var reviewer = (document.getElementById('rv-role') ? document.getElementById('rv-role').value : '') + ' / ' + (document.getElementById('rv-name') ? document.getElementById('rv-name').value : '');
+    RV.reviews[name] = { keyFeedback: keyFeedback, microSummary: microSummary, overall: ov, saved: true, reviewer: reviewer };
+    RV.saveReviews();
+    if (saveBtn) { saveBtn.innerHTML = AL.icon('check',{size:14,cls:'al-ic'}) + ' 已保存'; saveBtn.classList.add('saved'); }
+    RV.renderSummary();
+    toast('复盘已保存', 'ok');
+  }
+
+  function rvAiSuggest(name, area) {
+    var st = (RV.students.filter(function (x) { return x.name === name; }))[0];
+    if (!st) return;
+    var course = ALV2.store.get(RV.currentCourse);
+    var subs = st.subs || [];
+    if (!subs.length) { toast('该学员还没有提交任何学习迁移记录，无法生成 AI 建议', 'warn'); return; }
+    var fbMap = {}; flatBehaviors(course).forEach(function (o) { fbMap[o.behaviorId] = o; });
+    var keys = flatBehaviors(course).filter(function (o) { return o.kind === 'key'; });
+    function subFor(arr, bid) { for (var i = 0; i < (arr || []).length; i++) if (arr[i].behaviorId === bid) return arr[i]; return null; }
+    var keyBehaviors = keys.map(function (o) {
+      return { behaviorId: o.behaviorId, scene: o.b.scene, challenge: o.b.challenge, action: o.b.action, submission: subFor(subs, o.behaviorId) || {} };
+    });
+    var microSubmissions = subs.filter(function (s) { var o = fbMap[s.behaviorId]; return !o || o.kind !== 'key'; });
+    var metricLabel = (course.scenarios && course.scenarios[0] && course.scenarios[0].metric && course.scenarios[0].metric.name) || '';
+    var reviewCtx = { keyBehaviors: keyBehaviors, microSubmissions: microSubmissions, metricLabel: metricLabel };
+    var aiConfig = (course.aiConfig && course.aiConfig.apiKey) ? course.aiConfig : null;
+    if (!aiConfig) { toast('尚未配置 AI Key（设置 → AI 起草），无法生成建议', 'warn'); return; }
+    toast('AI 正在分析 ' + name + ' 的迁移记录…', 'ok');
+    ALV2.ai.reviewAssist(reviewCtx, aiConfig).then(function (res) {
+      (res.keyFeedback || []).forEach(function (kf) {
+        var ta = area.querySelector('[data-kf="' + kf.behaviorId + '"]');
+        var sel = area.querySelector('[data-rating="' + kf.behaviorId + '"]');
+        if (ta && kf.text) ta.value = kf.text;
+        if (sel && kf.rating) sel.value = kf.rating;
+      });
+      var mt = area.querySelector('.rv-micro-textarea');
+      if (mt && res.microSummary) mt.value = res.microSummary;
+      toast('已生成 AI 复盘建议，请确认后点「保存复盘」', 'ok');
+    }).catch(function (e) {
+      toast('AI 建议生成失败：' + (e && e.message ? e.message : e), 'warn');
+    });
   }
   // 初始化（自动注入不可删示范样例，再渲染课程列表）
   autoSeedSample();
