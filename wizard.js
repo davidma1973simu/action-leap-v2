@@ -221,14 +221,27 @@
   }
   function methodRow(sc, m, i) {
     var draft = m._draft ? ' draft' : '';
+    var behOpts = (sc.behaviors || []).map(function (b) {
+      var ck = (m.supports || []).indexOf(b.id) >= 0 ? 'checked' : '';
+      return '<label class="wz-chk"><input type="checkbox" data-wz-supp="' + esc(m.id) + '" value="' + esc(b.id) + '" ' + ck + '/> ' + esc((b.kind === 'key' ? '关 ' : '') + (b.action || b.scene || '行为')) + '</label>';
+    }).join('') || '<span class="wz-muted">先添加该场景的行为</span>';
     return '<div class="wz-item sm' + draft + '" data-mid="' + esc(m.id) + '">' +
       '<input class="in" data-m-name="' + esc(m.id) + '" value="' + esc(m.name) + '" placeholder="方法/工具名，如：5 Why" />' +
       '<input class="in" data-m-desc="' + esc(m.id) + '" value="' + esc(m.desc) + '" placeholder="怎么用（一句话）" />' +
       (m._draft ? '<span class="wz-tag sm">AI</span>' : '') +
-      '<button class="wz-del" data-del-m="' + esc(m.id) + '">✕</button></div>';
+      '<button class="wz-del" data-del-m="' + esc(m.id) + '">✕</button>' +
+      '<div class="wz-supp"><span class="wz-supp-t">支撑行为</span>' + behOpts + '</div></div>';
   }
 
   /* ---------- 步骤 5：改善指标 ---------- */
+  function wzSeriesRow(s) {
+    s = s || {};
+    return '<div class="wz-ms-row">' +
+      '<input class="in" data-wz-ms-label value="' + esc(s.label || '') + '" placeholder="期次" />' +
+      '<input class="in" data-wz-ms-value value="' + esc(s.value != null ? s.value : '') + '" placeholder="数值" />' +
+      '<input class="in" data-wz-ms-note value="' + esc(s.note || '') + '" placeholder="备注" />' +
+      '</div>';
+  }
   function stepMetric() {
     var d = state.draft;
     if (!d.scenarios.length) return '<div class="wz-empty">先添加场景。</div>';
@@ -242,7 +255,12 @@
         '<div class="wz-row">' +
         '<input class="in" data-mt-label="' + esc(sc.id) + '" value="' + esc(m.label) + '" placeholder="指标名，如：需求返工率" />' +
         '<input class="in" data-mt-target="' + esc(sc.id) + '" value="' + esc(m.target) + '" placeholder="目标，如：下降 30%" />' +
-        '</div></div>';
+        '</div>' +
+        '<div class="wz-series" data-sc="' + esc(sc.id) + '">' +
+        (m.series && m.series.length ? m.series.map(function (s) { return wzSeriesRow(s); }).join('') : '') +
+        '</div>' +
+        '<button class="btn btn-ghost btn-sm" data-mt-add-series="' + esc(sc.id) + '">+ 录入一期数值</button>' +
+        '</div>';
     });
     return html;
   }
@@ -397,6 +415,11 @@
     bindGeneric(el('wz-body'), '[data-del-m]', 'onclick', function (node) {
       deleteMethod(node.dataset.delM); renderBody();
     });
+    bindGeneric(el('wz-body'), '[data-wz-supp]', 'onchange', function (node) {
+      var m = findMethod(node.dataset.wzSupp); if (!m) return;
+      m.supports = [];
+      el('wz-body').querySelectorAll('[data-wz-supp="' + m.id + '"]:checked').forEach(function (cb) { m.supports.push(cb.value); });
+    });
 
     // step 5
     bindGeneric(el('wz-body'), '[data-mt-label]', 'oninput', function (node) {
@@ -404,6 +427,23 @@
     });
     bindGeneric(el('wz-body'), '[data-mt-target]', 'oninput', function (node) {
       var sc = findScene(node.dataset.mtTarget); if (sc) { sc.metric = sc.metric || {}; sc.metric.target = node.value; }
+    });
+    bindGeneric(el('wz-body'), '[data-mt-add-series]', 'onclick', function (node) {
+      var box = el('wz-body').querySelector('.wz-series[data-sc="' + node.dataset.mtAddSeries + '"]');
+      if (box) box.insertAdjacentHTML('beforeend', wzSeriesRow({}));
+    });
+    bindGeneric(el('wz-body'), '[data-wz-ms-label],[data-wz-ms-value],[data-wz-ms-note]', 'oninput', function (node) {
+      var box = node.closest('.wz-series'); if (!box) return;
+      var sc = findScene(box.dataset.sc); if (!sc) return;
+      sc.metric = sc.metric || {};
+      var ser = [];
+      box.querySelectorAll('.wz-ms-row').forEach(function (row) {
+        var label = row.querySelector('[data-wz-ms-label]').value.trim();
+        var val = row.querySelector('[data-wz-ms-value]').value.trim();
+        var note = row.querySelector('[data-wz-ms-note]').value.trim();
+        if (label || val) ser.push({ label: label, value: val, note: note });
+      });
+      sc.metric.series = ser;
     });
 
     // step 6

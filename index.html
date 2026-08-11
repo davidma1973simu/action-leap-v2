@@ -821,6 +821,52 @@
   .wz-ai-foot{ display:flex; justify-content:flex-end; gap:10px; margin-top:6px; }
   .wz-dg-status{ font-size:12.5px; color:var(--ink-3); margin-top:10px; min-height:16px; }
   .wz-ai .field{ margin-bottom:12px; }
+
+  /* ===== 价值证明：逻辑链 + 指标趋势 ===== */
+  .rp-subhead{ font-size:13px; font-weight:800; color:var(--ink); margin:18px 0 12px; padding-left:11px; border-left:3px solid var(--brand); }
+  .muted{ color:var(--ink-3); font-size:12.5px; }
+  .hint{ display:block; font-size:11.5px; color:var(--ink-3); font-weight:400; margin-top:3px; }
+  /* 价值逻辑链 */
+  .vc-intro, .mt-intro{ font-size:13px; color:var(--ink-2); line-height:1.7; margin-bottom:12px; background:var(--surface-2); border:1px solid var(--line); border-radius:11px; padding:11px 13px; }
+  .vc-sc{ border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:12px; background:var(--surface); }
+  .vc-sc-t{ font-weight:700; font-size:13.5px; margin-bottom:8px; color:var(--ink); }
+  .vc-row{ display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:13px; }
+  .vc-indent{ margin-left:14px; padding-left:12px; border-left:2px dashed var(--line); }
+  .vc-tag{ flex:0 0 auto; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:6px; color:#fff; }
+  .vc-tag.m{ background:#4338ca; }
+  .vc-tag.k{ background:#b45309; }
+  .vc-tag.mi{ background:#0f766e; }
+  .vc-tag.mt{ background:#b9791b; }
+  .vc-name{ color:var(--ink); line-height:1.5; }
+  .vc-target{ font-size:11.5px; color:var(--ink-3); margin-left:4px; }
+  /* 指标跟踪与趋势 */
+  .mt-card{ border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; background:var(--surface); }
+  .mt-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .mt-title{ font-weight:700; font-size:14px; color:var(--ink); }
+  .mt-delta{ font-size:13px; font-weight:800; }
+  .mt-delta.up{ color:var(--success); }
+  .mt-delta.down{ color:#dc2626; }
+  .mt-target{ font-size:12px; color:var(--ink-3); margin-top:2px; }
+  .mt-chart-wrap{ margin:12px 0 4px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:6px; }
+  .mt-chart{ width:100%; height:auto; display:block; }
+  .mt-chart-empty{ font-size:12.5px; color:var(--ink-3); background:var(--surface-2); border:1px dashed var(--line); border-radius:10px; padding:18px; text-align:center; }
+  .mt-edit{ margin-top:10px; border-top:1px dashed var(--line); padding-top:12px; }
+  .mt-edit-t{ font-size:12.5px; font-weight:700; color:var(--ink-2); margin-bottom:8px; }
+  .met-series-head{ display:flex; gap:6px; font-size:11px; color:var(--ink-3); margin-bottom:5px; padding:0 2px; }
+  .met-series-head span{ flex:1; } .met-series-head span:first-child{ flex:1.3; } .met-series-head span:nth-child(2){ flex:0.9; }
+  /* 多选区（方法支撑行为） */
+  .check-list{ display:flex; flex-direction:column; gap:8px; }
+  .rl-check{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); cursor:pointer; }
+  .rl-check input{ width:16px; height:16px; accent-color:var(--brand); }
+  /* 向导内方法支撑行为 / 指标序列 */
+  .wz-supp{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:6px; padding-top:6px; border-top:1px dashed var(--line); }
+  .wz-supp-t{ font-size:11.5px; color:var(--ink-3); font-weight:700; }
+  .wz-chk{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-2); }
+  .wz-chk input{ width:14px; height:14px; accent-color:var(--brand); }
+  .wz-series{ display:flex; flex-direction:column; gap:5px; margin-top:8px; }
+  .wz-ms-row{ display:flex; gap:6px; }
+  .wz-ms-row .in{ flex:1; }
+  .wz-muted{ font-size:12px; color:var(--ink-3); }
 </style>
 </head>
 <body>
@@ -1223,11 +1269,11 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=10"></script>
-<script src="sample-data.js?v=10"></script>
-<script src="icons.js?v=10"></script>
-<script src="ai.js?v=10"></script>
-<script src="wizard.js?v=10"></script>
+<script src="v2-core.js?v=11"></script>
+<script src="sample-data.js?v=11"></script>
+<script src="icons.js?v=11"></script>
+<script src="ai.js?v=11"></script>
+<script src="wizard.js?v=11"></script>
 <script>
   // =====================================================================
   //  公共工具
@@ -1829,6 +1875,11 @@
     var m = methodId && sc ? (sc.methods || []).filter(function (x) { return x.id === methodId; })[0] : null;
     document.getElementById('item-modal-title').textContent = m ? '编辑方法工具' : '添加方法工具';
     var body = document.getElementById('item-modal-body');
+    var behOptions = (sc ? (sc.behaviors || []) : []).map(function (b) {
+      var checked = (m && m.supports && m.supports.indexOf(b.id) >= 0) ? 'checked' : '';
+      return '<label class="rl rl-check"><input type="checkbox" value="' + esc(b.id) + '" ' + checked + ' data-msupp /> <span>' +
+        esc((b.kind === 'key' ? '【关键】' : '') + (b.action || b.scene || '行为')) + '</span></label>';
+    }).join('') || '<span class="muted">该场景还没有高绩效行为，请先添加行为</span>';
     body.innerHTML = '<div class="field"><label>工具名称<span class="req">*</span></label>' +
       '<input class="in" id="f_m_name" value="' + esc(m ? m.name : '') + '" placeholder="例如：战略规划的全局流程" /></div>' +
       '<div class="field"><label>说明</label>' +
@@ -1836,27 +1887,54 @@
       '<div class="field"><label>使用步骤（每行一条）</label>' +
       '<textarea class="in" id="f_m_steps" rows="4" placeholder="每写一条步骤，回车换行">' + esc(m && m.steps ? m.steps.join('\n') : '') + '</textarea></div>' +
       '<div class="field"><label>预期产出</label>' +
-      '<input class="in" id="f_m_output" value="' + esc(m ? m.output : '') + '" placeholder="使用这个工具后会产出什么？" /></div>';
+      '<input class="in" id="f_m_output" value="' + esc(m ? m.output : '') + '" placeholder="使用这个工具后会产出什么？" /></div>' +
+      '<div class="field"><label>支撑哪些高绩效行为<span class="hint">（建立「方法 → 行为 → 指标」的因果链）</span></label>' +
+      '<div class="check-list">' + behOptions + '</div></div>';
     document.getElementById('item-overlay').classList.add('show');
   }
 
-  // ---- 场景级绩效指标表单（不变）----
+  // ---- 场景级绩效指标表单（v5：含时间序列录入 + 口径）----
+  function metricSeriesRow(s, i) {
+    s = s || {};
+    return '<div class="met-series-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">' +
+      '<input class="in" data-ms-label placeholder="期次，如：第2周" value="' + esc(s.label || '') + '" style="flex:1.3;min-width:0" />' +
+      '<input class="in" data-ms-value placeholder="数值" value="' + esc(s.value != null ? s.value : '') + '" style="flex:0.9;min-width:0" />' +
+      '<input class="in" data-ms-note placeholder="备注（可选）" value="' + esc(s.note || '') + '" style="flex:2;min-width:0" />' +
+      '<button type="button" class="icon-btn danger" data-ms-del title="删除这期"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>' +
+      '</div>';
+  }
   function openSceneMetricForm(sceneId) {
     itemFormField = 'scene_metric'; itemFormId = sceneId;
     var sc = findScene(sceneId);
     var m = sc ? sc.metric : null;
     document.getElementById('item-modal-title').textContent = m ? '编辑绩效指标' : '设置绩效指标';
     var body = document.getElementById('item-modal-body');
+    var seriesRows = (m && m.series && m.series.length)
+      ? m.series.map(function (s) { return metricSeriesRow(s); }).join('')
+      : metricSeriesRow({ label: '训前基线', value: '', note: '' });
     body.innerHTML =
       '<div class="field"><label>指标名称<span class="req">*</span></label>' +
         '<input class="in" id="f_met_name" value="' + esc(m ? (m.label || m.name) : '') + '" placeholder="例如：战略执行计划完成度" /></div>' +
-      '<div class="grid-2"><div class="field"><label>当前基线</label>' +
+      '<div class="grid-2"><div class="field"><label>目标值</label>' +
+        '<input class="in" id="f_met_target" value="' + esc(m ? m.target : '') + '" placeholder="期望达到什么" /></div>' +
+        '<div class="field"><label>计量单位</label>' +
+        '<input class="in" id="f_met_unit" value="' + esc(m ? m.unit : '') + '" placeholder="如：分 / % / 万元" /></div></div>' +
+      '<div class="grid-2"><div class="field"><label>当前基线（文字说明）</label>' +
         '<input class="in" id="f_met_baseline" value="' + esc(m ? m.baseline : '') + '" placeholder="现状是什么" /></div>' +
-        '<div class="field"><label>目标值</label>' +
-        '<input class="in" id="f_met_target" value="' + esc(m ? m.target : '') + '" placeholder="期望达到什么" /></div></div>' +
+        '<div class="field"><label>口径说明</label>' +
+        '<input class="in" id="f_met_caliber" value="' + esc(m ? m.caliber : '') + '" placeholder="这个指标怎么算、谁来评" /></div></div>' +
+      '<div class="field"><label>时间序列<span class="hint">（训前基线 → 训后各期，HR 在复盘/汇报页持续录入）</span></label>' +
+        '<div class="met-series-head"><span>期次</span><span>数值</span><span>备注</span><span></span></div>' +
+        '<div id="met_series">' + seriesRows + '</div>' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="met_add_series">+ 添加一期</button></div>' +
       '<div class="field"><label>说明</label>' +
         '<textarea class="in" id="f_met_desc" rows="2" placeholder="这个指标衡量什么，怎么算达标">' + esc(m ? m.desc : '') + '</textarea></div>';
     document.getElementById('item-overlay').classList.add('show');
+    var box = document.getElementById('met_series');
+    box.onclick = function (e) { var del = e.target.closest('[data-ms-del]'); if (del) del.closest('.met-series-row').remove(); };
+    document.getElementById('met_add_series').onclick = function () {
+      box.insertAdjacentHTML('beforeend', metricSeriesRow({}));
+    };
   }
 
   // ---- 统一保存逻辑（v5）----
@@ -1917,6 +1995,8 @@
       var stepsStr = document.getElementById('f_m_steps').value;
       m.steps = stepsStr ? stepsStr.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s; }) : [];
       m.output = document.getElementById('f_m_output').value.trim();
+      m.supports = [];
+      document.querySelectorAll('#item-modal-body [data-msupp]:checked').forEach(function (cb) { m.supports.push(cb.value); });
       saveBuilder();
       document.getElementById('item-overlay').classList.remove('show');
       renderBuilder();
@@ -1932,7 +2012,17 @@
       scm2.metric.name = metName;
       scm2.metric.baseline = document.getElementById('f_met_baseline').value.trim();
       scm2.metric.target = document.getElementById('f_met_target').value.trim();
+      scm2.metric.unit = document.getElementById('f_met_unit').value.trim();
+      scm2.metric.caliber = document.getElementById('f_met_caliber').value.trim();
       scm2.metric.desc = document.getElementById('f_met_desc').value.trim();
+      var ser = [];
+      document.querySelectorAll('#item-modal-body .met-series-row').forEach(function (row) {
+        var label = row.querySelector('[data-ms-label]').value.trim();
+        var val = row.querySelector('[data-ms-value]').value.trim();
+        var note = row.querySelector('[data-ms-note]').value.trim();
+        if (label || val) ser.push({ label: label, value: val, note: note });
+      });
+      scm2.metric.series = ser;
       saveBuilder();
       document.getElementById('item-overlay').classList.remove('show');
       renderBuilder();
@@ -2615,18 +2705,133 @@
           return '<div class="rp-play"><span class="tag">' + esc(p.tag) + '</span><div><div class="pb-b">' + esc(p.title) + '</div><div class="pb-t">' + esc(p.text) + '</div><div class="pb-src">' + esc(p.src) + '</div></div></div>';
         }).join('') : '<div class="rp-empty">暂无可提炼的亮点。鼓励学员多打卡、多记录，亮点会自动浮现。</div>') + '</div>';
 
-      var sec4 = RP.secHead('4', '逻辑 · 培训价值证据链', '') + RP.buildChainHTML(course, students, allSubs, reviews) + '</div>';
+      var sec4 = RP.secHead('4', '逻辑 · 价值证明', '') +
+        RP.subHead('价值逻辑链（方法 → 行为 → 指标）') + RP.renderValueChain(course) +
+        RP.subHead('指标跟踪与长期趋势') + RP.renderMetricTracking(course) +
+        RP.subHead('培训价值证据链校验') + RP.buildChainHTML(course, students, allSubs, reviews) + '</div>';
 
       v.innerHTML = head + sec1 + sec2 + sec3 + sec4;
 
       document.getElementById('rp-export').onclick = function () { RP.exportHTML(course, students, allSubs, reviews, synth); };
       document.getElementById('rp-copy').onclick = function () { RP.copyText(course, students, allSubs, reviews, synth); };
+      // 指标跟踪录入交互（HR 持续录入各期数值）
+      document.querySelectorAll('[data-mt-add]').forEach(function (btn) {
+        btn.onclick = function () {
+          var box = document.querySelector('.mt-series[data-sc="' + btn.dataset.mtAdd + '"]');
+          if (box) box.insertAdjacentHTML('beforeend', metricSeriesRow({}));
+        };
+      });
+      document.querySelectorAll('[data-mt-save]').forEach(function (btn) {
+        btn.onclick = function () {
+          var scId = btn.dataset.mtSave;
+          var course2 = ALV2.store.get(RP.sku, 'config', null);
+          var sc = (course2.scenarios || []).filter(function (x) { return x.id === scId; })[0];
+          if (!sc) return;
+          sc.metric = sc.metric || {};
+          var box = document.querySelector('.mt-series[data-sc="' + scId + '"]');
+          var ser = [];
+          box.querySelectorAll('.met-series-row').forEach(function (row) {
+            var label = row.querySelector('[data-ms-label]').value.trim();
+            var val = row.querySelector('[data-ms-value]').value.trim();
+            var note = row.querySelector('[data-ms-note]').value.trim();
+            if (label || val) ser.push({ label: label, value: val, note: note });
+          });
+          sc.metric.series = ser;
+          ALV2.store.set(RP.sku, 'config', course2);
+          RP.renderView();
+          toast('指标已保存', 'ok');
+        };
+      });
     },
     secHead: function (n, title, ai) {
       var cat = {1:'框架 · Framework',2:'流程 · Flow',3:'亮点 · Highlights',4:'逻辑 · Logic'}[n] || '';
       return '<div class="rp-sec"><div class="rp-sec-h"><div class="rp-sec-n">' + n + '</div>' +
         '<div class="rp-sec-tx"><div class="rp-eyebrow">' + cat + '</div><h2>' + esc(title) + '</h2></div>' +
         (ai ? '<span class="ai">' + esc(ai) + '</span>' : '') + '</div>';
+    },
+    subHead: function (t) { return '<div class="rp-subhead">' + esc(t) + '</div>'; },
+    /* === 价值逻辑链：方法 → 行为 → 指标 的因果展示 === */
+    renderValueChain: function (course) {
+      var chains = ALV2.valueChain(course);
+      if (!chains.length) return '<div class="rp-empty">尚未配置场景，无法生成价值逻辑链。</div>';
+      var html = '<div class="vc-intro">从「课程方法工具」到「高绩效行为」再到「业务绩效指标」的因果链——回答高层最关心的「钱花得值不值」。</div>';
+      chains.forEach(function (c) {
+        var sc = c.scenario; var metric = c.metric || {}; var methods = c.methods || [];
+        html += '<div class="vc-sc"><div class="vc-sc-t">' + esc(sc.name) + '</div>';
+        if (methods.length) {
+          methods.forEach(function (me) {
+            html += '<div class="vc-row"><span class="vc-tag m">方法</span><span class="vc-name">' + esc(me.name) + '</span></div>';
+            var sups = me.supports || [];
+            if (sups.length) {
+              sups.forEach(function (b) {
+                html += '<div class="vc-row vc-indent"><span class="vc-tag ' + (b.kind === 'key' ? 'k' : 'mi') + '">' + (b.kind === 'key' ? '关键' : '微') + '</span><span class="vc-name">' + esc(b.action || '行为') + '</span></div>';
+              });
+            } else {
+              html += '<div class="vc-row vc-indent muted">（未指定支撑的行为 —— 请在配置端方法工具里勾选）</div>';
+            }
+          });
+        } else {
+          html += '<div class="vc-row muted">（该场景暂无方法工具）</div>';
+        }
+        if (metric.label || metric.name) {
+          html += '<div class="vc-row"><span class="vc-tag mt">指标</span><span class="vc-name">' + esc(metric.label || metric.name) +
+            (metric.target ? ' <span class="vc-target">目标：' + esc(metric.target) + '</span>' : '') + '</span></div>';
+        }
+        html += '</div>';
+      });
+      return html;
+    },
+    /* === 指标跟踪与长期趋势（HR 持续录入 + SVG 趋势图）=== */
+    renderMetricTracking: function (course) {
+      var scs = course.scenarios || [];
+      if (!scs.length) return '<div class="rp-empty">尚未配置场景指标。</div>';
+      var html = '<div class="mt-intro">HR 在此持续录入各期指标数值，系统自动生成趋势图——向组织证明培训带来的长期绩效改善。</div>';
+      scs.forEach(function (sc) {
+        var m = sc.metric || {};
+        if (!(m.label || m.name)) return;
+        var tr = ALV2.metricTrend(sc);
+        html += '<div class="mt-card" data-mt-sc="' + esc(sc.id) + '">';
+        html += '<div class="mt-head"><div class="mt-title">' + esc(m.label || m.name) + '</div>';
+        if (tr.hasData) {
+          var arrow = tr.delta > 0 ? '▲' : (tr.delta < 0 ? '▼' : '—');
+          var cls = tr.delta > 0 ? 'up' : (tr.delta < 0 ? 'down' : '');
+          html += '<div class="mt-delta ' + cls + '">' + arrow + ' ' + (tr.delta > 0 ? '+' : '') + tr.delta + (m.unit ? (' ' + m.unit) : '') +
+            (tr.deltaPct != null ? '（' + (tr.deltaPct > 0 ? '+' : '') + tr.deltaPct.toFixed(0) + '%）' : '') + '</div>';
+        }
+        html += '</div>';
+        if (m.target) html += '<div class="mt-target">目标：' + esc(m.target) + '</div>';
+        html += RP.trendChart(sc);
+        html += '<div class="mt-edit"><div class="mt-edit-t">录入 / 更新各期数值</div>' +
+          '<div class="met-series-head"><span>期次</span><span>数值</span><span>备注</span><span></span></div>' +
+          '<div class="mt-series" data-sc="' + esc(sc.id) + '">' +
+          (tr.labels.length ? tr.labels.map(function (l, idx) { return metricSeriesRow({ label: l, value: tr.values[idx], note: tr.notes[idx] }); }).join('') : metricSeriesRow({ label: '训前基线', value: '', note: '' })) +
+          '</div>' +
+          '<div style="display:flex;gap:8px;margin-top:8px">' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-mt-add="' + esc(sc.id) + '">+ 添加一期</button>' +
+          '<button type="button" class="btn btn-primary btn-sm" data-mt-save="' + esc(sc.id) + '">保存本指标</button>' +
+          '</div></div>';
+        html += '</div>';
+      });
+      return html;
+    },
+    trendChart: function (sc) {
+      var tr = ALV2.metricTrend(sc);
+      if (!tr.hasData) return '<div class="mt-chart-empty">录入至少两期数值后，此处显示趋势图。</div>';
+      var W = 680, H = 180, pad = 34;
+      var coords = tr.points.map(function (p) {
+        return [pad + p.x / 100 * (W - pad * 2), pad / 2 + p.y / 100 * (H - pad)];
+      });
+      var poly = coords.map(function (c) { return c[0].toFixed(1) + ',' + c[1].toFixed(1); }).join(' ');
+      var svg = '<svg class="mt-chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">';
+      svg += '<line x1="' + pad + '" y1="' + (H - pad / 2) + '" x2="' + (W - pad) + '" y2="' + (H - pad / 2) + '" stroke="#e8ecf3" stroke-width="1"/>';
+      svg += '<polyline points="' + poly + '" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+      coords.forEach(function (c, i) {
+        svg += '<circle cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="4" fill="#4f46e5"/>';
+        svg += '<text x="' + c[0].toFixed(1) + '" y="' + (c[1] - 10).toFixed(1) + '" font-size="11" fill="#1a2233" text-anchor="middle">' + esc(String(tr.values[i]) + (tr.unit ? tr.unit : '')) + '</text>';
+        svg += '<text x="' + c[0].toFixed(1) + '" y="' + (H - pad / 2 + 16).toFixed(1) + '" font-size="10" fill="#8a93a6" text-anchor="middle">' + esc(tr.labels[i]) + '</text>';
+      });
+      svg += '</svg>';
+      return '<div class="mt-chart-wrap">' + svg + '</div>';
     },
     kpi: function (n, l, ok) {
       return '<div class="rp-kpi' + (ok ? ' ok' : '') + '"><div class="n">' + esc(n) + '</div><div class="l">' + esc(l) + '</div></div>';
@@ -2821,7 +3026,15 @@
         '.rp-narr{background:#f6f4ff;border:1px solid #e2defb;border-radius:12px;padding:13px 15px;font-size:13.5px;line-height:1.75;margin-bottom:14px}' + '.rp-narr b{color:#4338ca}' +
         '.rp-sub-t{font-size:13px;font-weight:700;color:#5b6478;margin:12px 0 8px}' +
         '.chain-check{margin-bottom:10px}' + '.chain-step{display:flex;gap:10px}' + '.chain-dot{width:24px;height:24px;border-radius:50%;background:#4f46e5;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 24px}' +
-        '.chain-label{font-weight:700}' + '.chain-content{font-size:13px;color:#5b6478;margin:3px 0}' + '.chain-evidence{margin-top:4px}' + '.chain-ev-item{font-size:12px;color:#5b6478;display:flex;gap:6px;align-items:center}' + '.chain-status{font-size:11px;padding:2px 8px;border-radius:999px;background:#eef0ff;color:#4338ca;margin-left:auto}' +
+        '.chain-label{font-weight:700}' + '.chain-content{font-size:13px;color:#5b6478;margin:3px 0}' + '.chain-evidence{margin-top:4px}' + '.chain-ev-item{font-size:12px;color:#5b6478;display:flex;gap:6px;align-items:center}' +         '.chain-status{font-size:11px;padding:2px 8px;border-radius:999px;background:#eef0ff;color:#4338ca;margin-left:auto}' +
+        '.rp-subhead{font-size:13px;font-weight:800;margin:18px 0 12px;border-left:3px solid #4f46e5;padding-left:11px}' +
+        '.vc-sc,.mt-card{border:1px solid #e8ecf3;border-radius:12px;padding:12px 14px;margin-bottom:12px;page-break-inside:avoid}' +
+        '.vc-sc-t,.mt-title{font-weight:700}' + '.vc-row{display:flex;gap:8px;padding:5px 0;font-size:13px}' +
+        '.vc-indent{margin-left:14px;padding-left:12px;border-left:2px dashed #e8ecf3}' +
+        '.vc-tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;color:#fff}' +
+        '.vc-tag.m{background:#4338ca}.vc-tag.k{background:#b45309}.vc-tag.mi{background:#0f766e}.vc-tag.mt{background:#b9791b}' +
+        '.mt-head{display:flex;justify-content:space-between;align-items:center}' + '.mt-delta{font-weight:800}.mt-delta.up{color:#15a36e}.mt-delta.down{color:#dc2626}' +
+        '.mt-chart-wrap{border:1px solid #e8ecf3;border-radius:10px;padding:6px;margin:12px 0}' + '.mt-chart{width:100%;height:auto}' +
         '@media print{body{padding:14px 18px}} button{display:none}' +
         '</style></head><body>' + conte +
         '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},300);};</scr' + 'ipt>' +
@@ -2866,7 +3079,32 @@
       lines.push(synth.narrative.replace(/<b>|<\/b>/g, ''));
       synth.playbook.forEach(function (p) { lines.push('   - 【' + p.tag + '】' + p.title + '：' + p.text + '（' + p.src + '）'); });
       lines.push('');
-      lines.push('## 四、逻辑（培训价值证据链）');
+      lines.push('## 四、逻辑（培训价值与绩效改善）');
+      lines.push('### 4.1 价值逻辑链（方法 → 行为 → 指标）');
+      ALV2.valueChain(course).forEach(function (c) {
+        lines.push('   - 场景：' + (c.scenario.name || '（未命名）'));
+        (c.methods || []).forEach(function (me) {
+          if (!me.supports || !me.supports.length) return;
+          var acts = me.supports.map(function (b) { return b.action || '行为'; }).join('；');
+          lines.push('     · 方法「' + me.name + '」支撑行为：' + acts);
+        });
+        var ml = (c.metric && (c.metric.label || c.metric.name));
+        if (ml) lines.push('     · 指标：' + ml + (c.metric.target ? '（目标 ' + c.metric.target + '）' : ''));
+      });
+      lines.push('### 4.2 指标跟踪与长期趋势');
+      (course.scenarios || []).forEach(function (sc) {
+        var m = sc.metric || {};
+        if (!(m.label || m.name)) return;
+        var tr = ALV2.metricTrend(sc);
+        if (tr.hasData) {
+          lines.push('   - ' + (m.label || m.name) + '：' + tr.baseline + (m.unit ? m.unit : '') + ' → ' + tr.current + (m.unit ? m.unit : '') +
+            '（' + (tr.delta > 0 ? '+' : '') + tr.delta + (tr.deltaPct != null ? '，' + (tr.deltaPct > 0 ? '+' : '') + tr.deltaPct.toFixed(0) + '%' : '') + '）');
+          lines.push('     各期：' + tr.labels.map(function (l, i) { return l + ' ' + tr.values[i] + (m.unit ? m.unit : ''); }).join(' → '));
+        } else {
+          lines.push('   - ' + (m.label || m.name) + '：尚未录入时间序列数据');
+        }
+      });
+      lines.push('### 4.3 培训价值证据链');
       var ec = course.evidenceChain || {};
       ['spentWhat', 'changedWhat', 'producedWhat', 'earnedWhat'].forEach(function (k, i) {
         var lbl = ['投入了什么', '改变了什么', '产出了什么', '贡献了什么'][i];

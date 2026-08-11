@@ -365,10 +365,10 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=10"></script>
-<script src="sample-data.js?v=10"></script>
-<script src="icons.js?v=10"></script>
-<script src="ai.js?v=10"></script>
+<script src="v2-core.js?v=11"></script>
+<script src="sample-data.js?v=11"></script>
+<script src="icons.js?v=11"></script>
+<script src="ai.js?v=11"></script>
 <script>
 (function(){
   'use strict';
@@ -460,6 +460,11 @@
   }
   function findBehavior(id){var r=null;(course.scenarios||[]).forEach(function(sc){(sc.behaviors||[]).forEach(function(b){if(b.id===id)r={b:b,scenario:sc};});});return r;}
   function findScenarioOf(id){var r=null;(course.scenarios||[]).forEach(function(sc){(sc.behaviors||[]).forEach(function(b){if(b.id===id)r=sc;});});return r;}
+  function metricHintOf(bid){
+    var sc=findScenarioOf(bid);
+    if(!sc||!sc.metric||!(sc.metric.label||sc.metric.name)) return '';
+    return '<div class="metric-hint">本场景指标：'+esc(sc.metric.label||sc.metric.name)+(sc.metric.target?'（目标 '+esc(sc.metric.target)+'）':'')+'</div>';
+  }
 
   function buildSchedule(){
     schedule = ALV2.schedulePlan(course);
@@ -567,7 +572,7 @@
         '<div class="ring"></div><div class="main">'+
         '<div class="desc">'+esc(b.action)+'</div>'+
         '<div class="meta">场景：'+esc(b.scene)+'</div>'+
-        dayBadge+kindBadge+
+        dayBadge+kindBadge+ metricHintOf(b.id)+
         (done&&lastSub? '<div class="result"><b>结果：</b>'+esc(lastSub.resultImpact||'（已记录）')+'</div>' :
           (!done&&!future? '<div class="why"><b>为什么是它：</b>'+esc(b.challenge||'把课堂方法用进真实工作')+'</div>' : ''))+
         '</div><div class="st">'+st+'</div></div>';
@@ -583,6 +588,7 @@
           '<div class="desc">'+esc(tb.b.action)+'</div>'+
           '<div class="meta">场景：'+esc(tb.b.scene)+'</div>'+
           '<span class="daybadge">今天</span><span class="kind '+(tb.b.kind==='key'?'key':'micro')+'">'+(tb.b.kind==='key'?'关键行为':'微行为')+'</span>'+
+          metricHintOf(todayB.behaviorId)+
           '<div class="why"><b>为什么是它：</b>'+esc(tb.b.challenge||'')+'</div>'+
           '</div><div class="st">去记录</div></div>'+journey+html.replace(/<div class="sec">[\s\S]*?<\/div>/,'');
       }

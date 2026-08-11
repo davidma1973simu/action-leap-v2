@@ -168,7 +168,11 @@
         if (b.order == null) b.order = i;
       });
       sc.methods = sc.methods || [];
+      sc.methods.forEach(function (mm) { if (!mm.supports) mm.supports = []; });
       sc.metric = sc.metric || { label: '', target: '' };
+      if (!sc.metric.series) sc.metric.series = [];
+      if (sc.metric.unit == null) sc.metric.unit = '';
+      if (sc.metric.caliber == null) sc.metric.caliber = '';
     });
     return cfg;
   }
@@ -368,6 +372,58 @@
     };
   }
 
+  /* ---------- 价值逻辑链（方法 → 行为 → 指标）----------
+   * 返回每个场景的因果结构，供 P4「逻辑」块与配置端因果编辑使用。
+   */
+  function valueChain(course) {
+    return (course.scenarios || []).map(function (sc) {
+      var behMap = {};
+      (sc.behaviors || []).forEach(function (b) { behMap[b.id] = b; });
+      var methods = (sc.methods || []).map(function (m) {
+        var supports = (m.supports || []).map(function (bid) {
+          var b = behMap[bid];
+          return b ? { behaviorId: bid, action: b.action || '', kind: b.kind || 'micro' } : null;
+        }).filter(function (x) { return x; });
+        return { id: m.id, name: m.name, desc: m.desc, output: m.output, supports: supports };
+      });
+      return { scenario: sc, methods: methods, metric: sc.metric || {}, behaviors: sc.behaviors || [] };
+    });
+  }
+
+  /* ---------- 指标时间序列趋势 ----------
+   * 从 metric.series 提取数字序列，生成趋势面板与 SVG 所需坐标。
+   */
+  function metricTrend(sc) {
+    var m = sc.metric || {};
+    var series = (m.series || []).filter(function (p) {
+      return p && p.value !== '' && p.value != null && !isNaN(parseFloat(p.value));
+    });
+    var values = series.map(function (p) { return parseFloat(p.value); });
+    var labels = series.map(function (p) { return p.label || ''; });
+    var notes = series.map(function (p) { return p.note || ''; });
+    var hasData = values.length >= 2;
+    var baseline = values.length ? values[0] : null;
+    var current = values.length ? values[values.length - 1] : null;
+    var delta = (baseline != null && current != null) ? (current - baseline) : null;
+    var deltaPct = (baseline != null && baseline !== 0 && current != null)
+      ? ((current - baseline) / Math.abs(baseline) * 100) : null;
+    var min = values.length ? Math.min.apply(null, values) : 0;
+    var max = values.length ? Math.max.apply(null, values) : 1;
+    var span = (max - min) || 1;
+    var points = values.map(function (v, i) {
+      return {
+        x: values.length === 1 ? 50 : Math.round((i / (values.length - 1)) * 1000) / 10,
+        y: Math.round((1 - (v - min) / span) * 1000) / 10,
+        value: v, label: labels[i], note: notes[i]
+      };
+    });
+    return {
+      labels: labels, values: values, notes: notes, hasData: hasData,
+      baseline: baseline, current: current, delta: delta, deltaPct: deltaPct,
+      unit: m.unit || '', points: points
+    };
+  }
+
   global.ALV2 = {
     NS: NS,
     SKU: SKU,
@@ -383,6 +439,8 @@
     validateRhythm: validateRhythm,
     cohortStartDate: cohortStartDate,
     workdaySequence: workdaySequence,
+    valueChain: valueChain,
+    metricTrend: metricTrend,
     pkg: { schema: PACKAGE_SCHEMA, export: exportConfig, import: importConfig, validate: validatePackage }
   };
 })(window);
