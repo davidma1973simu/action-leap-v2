@@ -408,30 +408,35 @@
       return true;
     }catch(e){return false;}
   }
-  /* schema@5 自检：示范课若被旧版本污染，自动清旧重新注入（student.html 直访也能干净） */
+  /* schema@5 自检：示范课若被旧版本污染或完全缺失，自动注入 schema@5 示范课（直访 student.html 也能干净进入） */
   function autoHealSample(){
     if(!ALV2_SAMPLE) return;
     try{
       var sku = ALV2_SAMPLE.SAMPLE_SKU;
       var old = ALV2.store.get(sku,'config',null);
-      if(!old) return;
-      var sc = (old.scenarios||[])[0];
-      var bad = !sc || !Array.isArray(sc.behaviors) || sc.behaviors.length<8
-        || !Array.isArray(sc.methods) || sc.methods.length<1;
-      if(bad){
-        var sts0 = ALV2.store.get(sku,'students',null);
-        if(Array.isArray(sts0)) sts0.forEach(function(st){ ALV2.store.remove(sku,'subs:'+st.id); });
-        ALV2.store.remove(sku,'students');
-        ALV2.store.remove(sku,'config');
+      function _injectDemo(reason){
         var c = ALV2_SAMPLE.build();
         ALV2.store.set(sku,'config',c);
         var sts = ALV2_SAMPLE.students();
         ALV2.store.set(sku,'students',sts);
         sts.forEach(function(st){
-          ALV2.store.remove(sku,'subs:'+st.id);
+          ALV2.store.del(sku,'subs:'+st.id);
           ALV2.store.set(sku,'subs:'+st.id, ALV2_SAMPLE.buildSubmissions(c,st));
         });
-        console.log('[student.html] 已自动重置被污染的示范课 schema@5');
+        console.log('[student.html] 示范课 '+reason+'（'+sku+'）');
+      }
+      // 分支 1：localStorage 完全没示范课 → 直访学员端的常见场景（隐身 / 清缓存 / 换设备）
+      if(!old){ _injectDemo('首次访问已自动注入'); return; }
+      // 分支 2：有旧配置但 schema@5 不合规 → 清旧重注
+      var sc = (old.scenarios||[])[0];
+      var bad = !sc || !Array.isArray(sc.behaviors) || sc.behaviors.length<8
+        || !Array.isArray(sc.methods) || sc.methods.length<1;
+      if(bad){
+        var sts0 = ALV2.store.get(sku,'students',null);
+        if(Array.isArray(sts0)) sts0.forEach(function(st){ ALV2.store.del(sku,'subs:'+st.id); });
+        ALV2.store.del(sku,'students');
+        ALV2.store.del(sku,'config');
+        _injectDemo('已自动重置被污染的版本');
       }
     }catch(e){ console.warn('[student.html] autoHealSample skipped', e); }
   }

@@ -1988,9 +1988,9 @@
     var sku = ALV2_SAMPLE.SAMPLE_SKU;
     try {
       var sts0 = ALV2.store.get(sku, 'students', null);
-      if (Array.isArray(sts0)) sts0.forEach(function (st) { ALV2.store.remove(sku, 'subs:' + st.id); });
-      ALV2.store.remove(sku, 'students');
-      ALV2.store.remove(sku, 'config');
+      if (Array.isArray(sts0)) sts0.forEach(function (st) { ALV2.store.del(sku, 'subs:' + st.id); });
+      ALV2.store.del(sku, 'students');
+      ALV2.store.del(sku, 'config');
     } catch (e) { /* 忽略清理异常 */ }
     injectSample();
     openBuilder(sku);
@@ -2014,9 +2014,9 @@
       if (!bad) return;
       /* 旧示范课已坏：清掉 5 虚拟学员 + 10 提交，再覆盖 config */
       var sts0 = ALV2.store.get(sku, 'students', null);
-      if (Array.isArray(sts0)) sts0.forEach(function (st) { ALV2.store.remove(sku, 'subs:' + st.id); });
-      ALV2.store.remove(sku, 'students');
-      ALV2.store.remove(sku, 'config');
+      if (Array.isArray(sts0)) sts0.forEach(function (st) { ALV2.store.del(sku, 'subs:' + st.id); });
+      ALV2.store.del(sku, 'students');
+      ALV2.store.del(sku, 'config');
     }
     var c = ALV2_SAMPLE.build();
     ALV2.store.set(sku, 'config', c);
