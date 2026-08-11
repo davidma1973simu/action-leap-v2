@@ -946,6 +946,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></svg>
                 看示范样例
               </button>
+              <button class="btn btn-ghost" id="btn-sample-reset" title="示范课配置若显示为空/错乱，一键覆盖回出厂数据">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+                重新载入示范课
+              </button>
               <button class="btn btn-ghost" id="btn-import">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
                 载入配置包
@@ -1219,11 +1223,11 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=9"></script>
-<script src="sample-data.js"></script>
-<script src="icons.js"></script>
-<script src="ai.js"></script>
-<script src="wizard.js"></script>
+<script src="v2-core.js?v=10"></script>
+<script src="sample-data.js?v=10"></script>
+<script src="icons.js?v=10"></script>
+<script src="ai.js?v=10"></script>
+<script src="wizard.js?v=10"></script>
 <script>
   // =====================================================================
   //  公共工具
@@ -1977,6 +1981,21 @@
     toast('已载入示范课程（松下电机 · 战略执行沙盘）', 'ok');
   }
 
+  /* 一键强制覆盖示范课：无论本地是否已有数据，都清掉旧 config/学员/提交，重新注入出厂样本。
+     用于用户升级后出现"场景在但行为/方法为空"的缓存污染场景。 */
+  function forceReloadSample() {
+    var sku = ALV2_SAMPLE.SAMPLE_SKU;
+    try {
+      var sts0 = ALV2.store.get(sku, 'students', null);
+      if (Array.isArray(sts0)) sts0.forEach(function (st) { ALV2.store.remove(sku, 'subs:' + st.id); });
+      ALV2.store.remove(sku, 'students');
+      ALV2.store.remove(sku, 'config');
+    } catch (e) { /* 忽略清理异常 */ }
+    injectSample();
+    openBuilder(sku);
+    toast('已强制重新载入示范课（松下电机 · 战略执行沙盘）', 'ok');
+  }
+
   /* 不可删示范样例：全链路注入（配置 + 5 虚拟学员 + 两周打卡） */
   /* 不可删示范样例：全链路注入（配置 + 5 虚拟学员 + 10 条高绩效行为提交） */
   function injectSample() {
@@ -2049,6 +2068,7 @@
   };
 
   document.getElementById('btn-sample').onclick = function () { seedSample(); };
+  document.getElementById('btn-sample-reset').onclick = function () { forceReloadSample(); };
 
   // =====================================================================
   //  P2（改）：学员端（手机）入口页
