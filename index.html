@@ -1607,12 +1607,12 @@
   function renderSceneMetric(sc) {
     var m = sc.metric;
     var html = '<div class="scene-metric-area">';
-    if (m && m.name) {
+    if (m && (m.label || m.name)) {
       html += '<div class="section-banner acc-metric">' +
         '<span class="sb-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>' +
         '绩效指标' +
         '<span class="sb-sub">本场景最终要产出的业务结果</span></div>' +
-        '<div class="scene-metric-value">' + esc(m.name) + '</div>';
+        '<div class="scene-metric-value">' + esc(m.label || m.name) + '</div>';
       if (m.target) html += '<div class="scene-metric-detail">目标值：' + esc(m.target) + '</div>';
       if (m.baseline) html += '<div class="scene-metric-detail">当前基线：' + esc(m.baseline) + '</div>';
       if (m.desc) html += '<div class="scene-metric-detail">' + esc(m.desc) + '</div>';
@@ -1849,7 +1849,7 @@
     var body = document.getElementById('item-modal-body');
     body.innerHTML =
       '<div class="field"><label>指标名称<span class="req">*</span></label>' +
-        '<input class="in" id="f_met_name" value="' + esc(m ? m.name : '') + '" placeholder="例如：战略执行计划完成度" /></div>' +
+        '<input class="in" id="f_met_name" value="' + esc(m ? (m.label || m.name) : '') + '" placeholder="例如：战略执行计划完成度" /></div>' +
       '<div class="grid-2"><div class="field"><label>当前基线</label>' +
         '<input class="in" id="f_met_baseline" value="' + esc(m ? m.baseline : '') + '" placeholder="现状是什么" /></div>' +
         '<div class="field"><label>目标值</label>' +
@@ -1928,6 +1928,7 @@
       var scm2 = findScene(id);
       if (!scm2) { toast('找不到场景', 'err'); return; }
       scm2.metric = scm2.metric || {};
+      scm2.metric.label = metName;
       scm2.metric.name = metName;
       scm2.metric.baseline = document.getElementById('f_met_baseline').value.trim();
       scm2.metric.target = document.getElementById('f_met_target').value.trim();
@@ -2648,8 +2649,8 @@
         var chips = '';
         (sc.methods || []).forEach(function (m) { chips += '<span class="rp-chip m">' + esc(m.name) + '</span>'; });
         if (chips) html += '<div class="rp-chips">' + chips + '</div>';
-        if (sc.metric && (sc.metric.name || sc.metric.target)) {
-          html += '<div class="rp-metric"><span class="k">场景指标</span>：<b>' + esc(sc.metric.name || '未命名') + '</b>'
+        if (sc.metric && (sc.metric.label || sc.metric.name || sc.metric.target)) {
+          html += '<div class="rp-metric"><span class="k">场景指标</span>：<b>' + esc(sc.metric.label || sc.metric.name || '未命名') + '</b>'
             + (sc.metric.target ? ' · 目标 ' + esc(sc.metric.target) : '')
             + (sc.metric.caliber ? ' · 口径 ' + esc(sc.metric.caliber) : '') + '</div>';
         }
@@ -2847,7 +2848,7 @@
           lines.push('   - ' + (b.kind === 'key' ? '【关键】' : '') + (b.action || '行为') + (sub ? '（' + sub + '）' : ''));
         });
         if (sc.methods && sc.methods.length) lines.push('   - 方法工具：' + sc.methods.map(function (m) { return m.name; }).join('、'));
-        if (sc.metric && sc.metric.name) lines.push('   - 场景指标：' + sc.metric.name + (sc.metric.target ? '（目标 ' + sc.metric.target + '）' : ''));
+        if (sc.metric && (sc.metric.label || sc.metric.name)) lines.push('   - 场景指标：' + (sc.metric.label || sc.metric.name) + (sc.metric.target ? '（目标 ' + sc.metric.target + '）' : ''));
       });
       lines.push('');
       lines.push('## 二、流程（学习落地）');
@@ -2946,7 +2947,7 @@
       return { behaviorId: o.behaviorId, scene: o.b.scene, challenge: o.b.challenge, action: o.b.action, submission: subFor(subs, o.behaviorId) || {} };
     });
     var microSubmissions = subs.filter(function (s) { var o = fbMap[s.behaviorId]; return !o || o.kind !== 'key'; });
-    var metricLabel = (course.scenarios && course.scenarios[0] && course.scenarios[0].metric && course.scenarios[0].metric.name) || '';
+    var metricLabel = (course.scenarios && course.scenarios[0] && course.scenarios[0].metric && (course.scenarios[0].metric.label || course.scenarios[0].metric.name)) || '';
     var reviewCtx = { keyBehaviors: keyBehaviors, microSubmissions: microSubmissions, metricLabel: metricLabel };
     var aiConfig = (course.aiConfig && course.aiConfig.apiKey) ? course.aiConfig : null;
     if (!aiConfig) { toast('尚未配置 AI Key（设置 → AI 起草），无法生成建议', 'warn'); return; }
