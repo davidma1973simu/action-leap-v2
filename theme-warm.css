@@ -1,0 +1,146 @@
+/* ============================================================
+   Action Leap V2 · 温暖消费品风主题 (Direction A)
+   作用：覆盖 index.html / student.html 内联 <style> 的变量与组件样式
+   链接位置：必须放在各页 <style> 之后、</head> 之前（后定义者胜出）
+   设计基调：奶油暖底 + 珊瑚橙主行动色 + 靛蓝品牌点缀
+            大圆角柔影卡片 · 大胶囊按钮 · 慷慨留白 · 友好线性图标
+   ============================================================ */
+
+:root{
+  /* ---- 暖中性基底（奶油/蜜桃，告别冷灰）---- */
+  --bg:#FBF3EA; --surface:#FFFDFA; --surface-2:#FBF1E8;
+  --ink:#2C2620; --ink-2:#6F655A; --ink-3:#A89C8E;
+  --line:#F0E4D7; --line-2:#F8EFE5;
+
+  /* ---- 珊瑚橙：主行动色（温暖、亲和、C端感）---- */
+  --primary:#FF7A4D; --primary-600:#F2602E; --primary-soft:#FFE9DF; --primary-ring:rgba(255,122,77,.22);
+
+  /* ---- 语义色（暖调）---- */
+  --success:#2FAE7A; --success-soft:#E4F6EE;
+  --warn:#E08A1E;    --warn-soft:#FBEFD9;
+  --danger:#E5614F;  --danger-soft:#FCE6E1;
+
+  /* ---- 品牌靛蓝（仅作身份/深度点缀，保留品牌资产）---- */
+  --brand:#4F46E5; --brand-deep:#4338CA; --brand-soft:#EEF0FF;
+  --brand-50:#F5F6FF; --brand-line:#C7CBFF; --brand-glow:rgba(79,70,229,.16);
+
+  /* ---- 大圆角（消费品质感）---- */
+  --r:24px; --r-sm:16px; --r-md:18px; --r-lg:22px; --r-xl:28px; --r-full:999px;
+
+  /* ---- 柔影（暖棕调，告别冷蓝硬影）---- */
+  --shadow-sm:0 2px 8px rgba(150,95,55,.05),0 6px 18px rgba(150,95,55,.07);
+  --shadow-md:0 8px 24px rgba(150,95,55,.08),0 20px 48px rgba(150,95,55,.10);
+  --shadow-lg:0 16px 40px rgba(150,95,55,.12),0 36px 80px rgba(150,95,55,.16);
+  --sh-xs:0 1px 2px rgba(150,95,55,.04),0 2px 6px rgba(150,95,55,.05);
+  --sh-sm:0 2px 8px rgba(150,95,55,.05),0 8px 20px rgba(150,95,55,.07);
+  --sh-md:0 4px 14px rgba(150,95,55,.07),0 18px 40px rgba(150,95,55,.10);
+  --sh-lg:0 8px 24px rgba(150,95,55,.10),0 30px 70px rgba(150,95,55,.14);
+  --sh-brand:0 10px 30px rgba(255,122,77,.12),0 3px 8px rgba(255,122,77,.08);
+
+  /* 字体保持 Outfit + 中文系统字体（圆润友好） */
+  --font-sans:"Outfit",-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif;
+}
+
+/* ====================== 暖底渐变（替换冷调光晕）====================== */
+body{
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(1200px 620px at 100% -12%, #FFE7D6, transparent 58%),
+    radial-gradient(940px 540px at -10% 8%, #FFEFE0, transparent 55%);
+  background-attachment:fixed;
+}
+
+/* ====================== 按钮：大胶囊 + 珊瑚橙 ====================== */
+.btn{ border-radius:var(--r-full); padding:11px 22px; font-weight:600; letter-spacing:.01em; }
+.btn-primary{
+  background:linear-gradient(135deg,var(--primary),var(--primary-600));
+  color:#fff; box-shadow:0 8px 22px rgba(255,122,77,.28);
+}
+.btn-primary:hover{ transform:translateY(-2px); box-shadow:0 12px 30px rgba(255,122,77,.34); }
+.btn-ghost{ background:var(--surface); color:var(--ink-2); border-color:var(--line); }
+.btn-ghost:hover{ border-color:var(--primary); color:var(--primary-600); transform:translateY(-1px); }
+.btn-success{ background:var(--success); color:#fff; }
+.btn-danger{ color:var(--danger); border-color:#f6cfc8; background:var(--surface); }
+
+/* ====================== 侧边导航：选中态转暖 ====================== */
+.nav-item.active{
+  background:var(--primary-soft); color:var(--primary-600); font-weight:700;
+  box-shadow:inset 3px 0 0 var(--primary);
+}
+.nav-item:hover{ background:var(--surface-2); color:var(--ink); }
+/* 侧边栏暖化为浅暖底，告别生硬白柱 */
+.sidebar{ background:var(--surface-2); border-right:1px solid var(--line); }
+
+/* ====================== 卡片：大圆角 + 柔影（统一消费品质感）====================== */
+.card,.course-card,.loop-card,.modal,.drawer,.rv-student-card,.rv-summary-card,
+.map-card,.prog-card,.rule-c,.task-block,.scene-metric-area,.evidence-section,
+.ev-step,.chain-check,.form-card,.st-identity,.habit-card,.section-banner{
+  border-radius:var(--r);
+  box-shadow:var(--shadow-md);
+  border-color:var(--line);
+}
+.card-hover:hover{ transform:translateY(-3px); box-shadow:var(--shadow-lg); border-color:var(--primary-soft); }
+
+/* 模态/抽屉更圆润 */
+.modal{ border-radius:var(--r-xl); }
+.drawer{ border-radius:var(--r-xl) 0 0 var(--r-xl); }
+
+/* ====================== 进度/强调色统一为珊瑚橙 ====================== */
+.bar > i{ background:linear-gradient(90deg,var(--primary),var(--primary-600)); }
+.ring{ background:conic-gradient(var(--primary) calc(var(--p) * 1%), var(--line) 0); }
+.prog-num{ color:var(--primary-600); }
+.rv-stat-num{ color:var(--primary-600); }
+.rv-avatar{ background:var(--primary-soft); color:var(--primary-600); }
+.bi-dot{ background:var(--primary); }
+.habit-dot{ background:var(--primary); }
+
+/* ====================== 硬码强调色（原靛蓝/红）→ 暖调 ====================== */
+.scene-metric-label{ color:var(--primary-600); }
+.scene-metric-value{ color:var(--primary-600); }
+.celebrate-title{ color:var(--primary-600); }
+.loop-eyebrow{ color:var(--primary-600); }
+.ev-head{ background:linear-gradient(135deg,#FCE9E4,#FCE7E1); border-color:rgba(229,97,79,.25); }
+.ev-head-title{ color:var(--danger); }
+.ev-step{ border-color:rgba(229,97,79,.20); }
+.ev-step-label{ color:var(--danger); }
+.ev-link-q{ color:var(--danger); }
+.ev-arrow{ color:var(--danger); }
+
+/* 胶囊标签更圆润 */
+.badge-sample,.status,.pill{ border-radius:var(--r-full); }
+
+/* ====================== 学员手机端（student.html）暖化 ====================== */
+.phone{
+  border-radius:38px;
+  box-shadow:0 0 0 1px var(--line),0 36px 90px rgba(150,95,55,.18);
+  background:var(--surface);
+}
+/* 顶部导航条暖化（student 用 .topbar） */
+.topbar{ background:rgba(255,253,250,.86); backdrop-filter:blur(14px); border-bottom:1px solid var(--line-2); }
+/* 行为卡 / 区块卡：大圆角柔影 */
+.block,.behavior,.habit-card,.j-top,.cele-box,.map-card,.course-card{
+  border-radius:var(--r); box-shadow:var(--shadow-sm); border-color:var(--line);
+}
+/* 旅程进度条珊瑚橙 */
+.j-fill,.progress > i,.bar > i{ background:linear-gradient(90deg,var(--primary),var(--primary-600)); }
+/* 庆祝层暖色 */
+.cele-box{ background:var(--surface); border-radius:var(--r-xl); }
+.cele-title{ color:var(--primary-600); }
+
+/* ====================== 暗色模式（暖调兜底，避免冷蓝）====================== */
+[data-theme="dark"]{
+  --bg:#1E1A17; --surface:#26211C; --surface-2:#2E2823;
+  --ink:#F3ECE4; --ink-2:#C3B6A8; --ink-3:#8C8175;
+  --line:#3A332C; --line-2:#2E2823;
+  --primary:#FF8C5E; --primary-600:#F2703C; --primary-soft:#3A2A22;
+  --brand:#8B83F0; --brand-soft:#23203E;
+  --shadow-sm:0 2px 8px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.5);
+  --shadow-md:0 8px 24px rgba(0,0,0,.45),0 20px 48px rgba(0,0,0,.55);
+  --shadow-lg:0 16px 40px rgba(0,0,0,.5),0 36px 80px rgba(0,0,0,.6);
+}
+[data-theme="dark"] body{
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(1200px 620px at 100% -12%, #3A2A22, transparent 58%),
+    radial-gradient(940px 540px at -10% 8%, #2E2823, transparent 55%);
+}
