@@ -11,20 +11,44 @@
   ALV2.ai = {};
 
   /* 主流大模型预设（均兼容 OpenAI /chat/completions 协议）
-   * 设置弹窗里只选这几个 + 填 Key，全产品共用。 */
+   * 设置弹窗里只选这几个 + 填 Key，全产品共用。
+   * icon: 内嵌 SVG 字符串（弹窗左侧图标方块用）；desc: 一句话副标题 */
   var PROVIDERS = [
-    { id: 'openai', name: 'OpenAI', color: '#10a37f', baseURL: 'https://api.openai.com/v1',
-      models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1', 'o4-mini'] },
-    { id: 'deepseek', name: 'DeepSeek', color: '#4d6bfe', baseURL: 'https://api.deepseek.com/v1',
-      models: ['deepseek-chat', 'deepseek-reasoner'] },
-    { id: 'qwen', name: '通义千问', color: '#615ced', baseURL: 'https://dashscope.aliyun.com/compatible-mode/v1',
-      models: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'] },
-    { id: 'glm', name: '智谱 GLM', color: '#3a7afe', baseURL: 'https://open.bigmodel.cn/api/paas/v4',
-      models: ['glm-4-plus', 'glm-4-air', 'glm-4-flash'] },
-    { id: 'kimi', name: 'Kimi', color: '#3b5bff', baseURL: 'https://api.moonshot.cn/v1',
-      models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'] },
-    { id: 'doubao', name: '豆包', color: '#2f6bff', baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
-      models: ['doubao-seed-1.6-250615', 'doubao-pro-32k', 'doubao-lite-32k'] }
+    { id: 'deepseek', name: 'DeepSeek', color: '#4d6bfe',
+      desc: '国内访问快，性价比高',
+      baseURL: 'https://api.deepseek.com/v1',
+      models: ['deepseek-chat', 'deepseek-reasoner'],
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0-6 6c0 2.2 1.2 4.1 3 5.2L7 21l5-2 5 2-2-6.8A6 6 0 0 0 12 3z"/></svg>' },
+    { id: 'openai', name: 'OpenAI', color: '#10a37f',
+      desc: 'GPT 系列，原厂接口',
+      baseURL: 'https://api.openai.com/v1',
+      models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1', 'o4-mini'],
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12a4 4 0 0 1 8 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>' },
+    { id: 'gemini', name: 'Gemini', color: '#3b82f6',
+      desc: 'Google 原生，需走兼容端点',
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      models: ['gemini-2.0-flash', 'gemini-1.5-pro'],
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.4L20 10l-4 4.2L17 21l-5-3-5 3 1-6.8L4 10l5.6-1.6z"/></svg>' },
+    { id: 'qwen', name: '通义千问', color: '#615ced',
+      desc: '阿里云 DashScope',
+      baseURL: 'https://dashscope.aliyun.com/compatible-mode/v1',
+      models: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'],
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 19h16M9 5v14M15 5v14"/></svg>' },
+    { id: 'glm', name: '智谱 GLM', color: '#3a7afe',
+      desc: '清华系国产 GLM-4',
+      baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+      models: ['glm-4-plus', 'glm-4-air', 'glm-4-flash'],
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/></svg>' },
+    { id: 'kimi', name: 'Kimi', color: '#1e1e1e',
+      desc: '月之暗面 · 长文本强',
+      baseURL: 'https://api.moonshot.cn/v1',
+      models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/><path d="M8.5 15c1 .8 2.2 1.2 3.5 1.2"/></svg>' },
+    { id: 'doubao', name: '豆包', color: '#2f6bff',
+      desc: '字节火山方舟',
+      baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+      models: ['doubao-seed-1.6-250615', 'doubao-pro-32k', 'doubao-lite-32k'],
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12c0-3.3 2.7-6 6-6s6 2.7 6 6v3a3 3 0 0 1-3 3h-1v-6h4"/><path d="M6 12v3a3 3 0 0 0 3 3h1v-6H6"/></svg>' }
   ];
   function providerById(id) {
     for (var i = 0; i < PROVIDERS.length; i++) if (PROVIDERS[i].id === id) return PROVIDERS[i];

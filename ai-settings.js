@@ -2,6 +2,11 @@
  * 全产品共用一份 AI 配置（不挂在课程下）：选主流大模型 + 填一次 Key。
  * 配置起草 / 学员陪练 / 复盘建议 / 高层简报 都读 ALV2.getAIConfig()。
  * 本文件被 index.html（后台）与 student.html（学员端）共用。
+ *
+ * 设计语言（2026-08-17 翻新 · 对齐消费品级审美）：
+ *   · 单列大卡片式单选，左侧品牌色图标方块 + 标题/副标题，右侧大圆点
+ *   · 选中态：边框 + 图标方块 同步点亮（用 --primary 珊瑚橙，DeepSeek 蓝作为示例色）
+ *   · API Key 输入框大圆角胶囊 + 底部「返回 / 保存设置」一组按钮
  */
 (function (global) {
   'use strict';
@@ -23,40 +28,50 @@
     overlay.className = 'overlay ai-set-overlay';
     overlay.id = 'ai-set-overlay';
     overlay.innerHTML =
-      '<div class="modal ai-set-modal">' +
-        '<div class="modal-head">' +
-          '<div><div class="ey">AI 能力 · 全产品共用</div><h3>配置大模型</h3></div>' +
-          '<button class="x-btn" data-close="ai-set-overlay" aria-label="关闭">' +
-            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>' +
-          '</button>' +
+      '<div class="modal ai-set-modal" role="dialog" aria-label="AI 设置">' +
+        '<button class="x-btn" data-close="ai-set-overlay" aria-label="关闭">' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>' +
+        '</button>' +
+        '<div class="ai-set-header">' +
+          '<h2>AI 设置</h2>' +
+          '<p class="ai-set-sub">选一个模型品牌，填入你的 API Key 即可使用。</p>' +
         '</div>' +
-        '<div class="modal-body">' +
-          '<p class="ai-set-sub">选一个主流大模型、填一次 Key，全产品共用：配置起草 · 学员陪练 · 复盘建议 · 高层简报。Key 仅存本机浏览器，绝不外传、不进导出包。</p>' +
-          '<div class="ai-prov-grid" id="ai-prov-grid"></div>' +
-          '<div class="ai-set-row">' +
-            '<div class="field"><label>模型</label><select id="ai-set-model" class="in"></select></div>' +
+        '<div class="ai-set-body">' +
+          '<div class="ai-set-label">模型品牌</div>' +
+          '<div class="ai-prov-list" id="ai-prov-grid"></div>' +
+          '<div class="ai-set-label" style="margin-top:24px">API Key</div>' +
+          '<div class="ai-set-input-row">' +
+            '<input id="ai-set-key" type="password" class="in ai-set-input" placeholder="sk-..." autocomplete="off" spellcheck="false" />' +
+            '<button type="button" class="btn btn-test" id="ai-set-test-btn">先测试连接</button>' +
           '</div>' +
-          '<div class="field"><label>API Key</label><input id="ai-set-key" type="password" class="in" placeholder="sk-... / 你的密钥" autocomplete="off" /></div>' +
-          '<details class="ai-adv"><summary>高级（自定义接口地址）</summary>' +
-            '<div class="field"><label>接口地址（OpenAI 兼容 /chat/completions）</label><input id="ai-set-url" class="in" placeholder="https://api.openai.com/v1" /></div>' +
-          '</details>' +
           '<div class="ai-set-test" id="ai-set-test"></div>' +
+          '<details class="ai-adv">' +
+            '<summary>高级（自定义接口与模型）</summary>' +
+            '<div class="ai-adv-grid">' +
+              '<div class="field"><label>接口地址（OpenAI 兼容 /chat/completions）</label><input id="ai-set-url" class="in" placeholder="https://api.openai.com/v1" /></div>' +
+              '<div class="field"><label>模型</label><select id="ai-set-model" class="in"></select></div>' +
+            '</div>' +
+          '</details>' +
         '</div>' +
-        '<div class="modal-foot">' +
+        '<div class="ai-set-foot">' +
           '<span class="ai-set-status" id="ai-set-status"></span>' +
           '<span class="spacer"></span>' +
-          '<button class="btn btn-ghost btn-sm" id="ai-set-test-btn">测试连接</button>' +
-          '<button class="btn btn-primary btn-sm" id="ai-set-save">保存</button>' +
+          '<button class="btn btn-ghost btn-back" data-close="ai-set-overlay">返回</button>' +
+          '<button class="btn btn-primary btn-save" id="ai-set-save">保存设置</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
 
-    // 关闭：点遮罩 / 关闭按钮
+    // 关闭：点遮罩 / 关闭按钮 / 返回
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay || (e.target.dataset && e.target.dataset.close === 'ai-set-overlay')) close();
+      var closeId = e.target.dataset && e.target.dataset.close;
+      if (e.target === overlay || closeId === 'ai-set-overlay') close();
     });
     $('ai-set-save').onclick = save;
     $('ai-set-test-btn').onclick = testConn;
+    // 输入 URL 时标记手动改过
+    var urlEl = $('ai-set-url');
+    if (urlEl) urlEl.oninput = function () { urlEl.dataset.touched = '1'; };
     mounted = true;
   }
 
@@ -65,8 +80,16 @@
     if (!grid) return;
     var provs = (ALV2.ai && ALV2.ai.PROVIDERS) || [];
     grid.innerHTML = provs.map(function (p) {
-      return '<button type="button" class="ai-prov" data-pid="' + p.id + '" style="--pc:' + esc(p.color) + '">' +
-        '<span class="dot"></span>' + esc(p.name) + '</button>';
+      return '<button type="button" class="ai-prov" data-pid="' + esc(p.id) + '" style="--pc:' + esc(p.color || '#777') + '">' +
+        '<span class="ai-prov-ic">' + (p.icon || '') + '</span>' +
+        '<span class="ai-prov-text">' +
+          '<span class="ai-prov-name">' + esc(p.name) + '</span>' +
+          '<span class="ai-prov-desc">' + esc(p.desc || '') + '</span>' +
+        '</span>' +
+        '<span class="ai-prov-check" aria-hidden="true">' +
+          '<span class="ai-prov-check-dot"></span>' +
+        '</span>' +
+      '</button>';
     }).join('');
     Array.prototype.forEach.call(grid.querySelectorAll('.ai-prov'), function (btn) {
       btn.onclick = function () { selectProvider(btn.getAttribute('data-pid')); };
@@ -97,12 +120,12 @@
     var url = $('ai-set-url');
     url.value = cfg.baseURL || '';
     url.dataset.touched = '0';
-    url.oninput = function () { url.dataset.touched = '1'; };
     $('ai-set-test').textContent = '';
-    // 选中当前 provider / 或第一个
-    var pid = (cfg.provider && cfg.provider !== 'openai-compatible') ? cfg.provider : null;
+    $('ai-set-test').className = 'ai-set-test';
+    // 选中当前 provider
+    var pid = cfg.provider;
     var provs = (ALV2.ai && ALV2.ai.PROVIDERS) || [];
-    if (!pid && provs.length) {
+    if ((!pid || pid === 'openai-compatible') && provs.length) {
       // 尝试按 baseURL 匹配
       for (var i = 0; i < provs.length; i++) if (provs[i].baseURL === (cfg.baseURL || '')) { pid = provs[i].id; break; }
       if (!pid) pid = provs[0].id;
