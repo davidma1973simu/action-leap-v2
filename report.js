@@ -259,9 +259,9 @@
   function generate(sku) {
     if (!sku) throw new Error('缺少课程 ID');
     var ctx = assemble(sku);
-    var aiConfig = (ctx.course && ctx.course.aiConfig) || null;
+    var aiConfig = ALV2.getAIConfig();
     if (!aiConfig || !aiConfig.apiKey) {
-      var err = new Error('本课程尚未配置 API Key。请在「配置构建器 → AI 设置」里填写 Key 后重试');
+      var err = new Error('尚未配置 AI。请点左上角「AI 设置」选模型并填入 API Key 后重试');
       err.code = 'NO_KEY';
       throw err;
     }

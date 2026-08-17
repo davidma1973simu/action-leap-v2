@@ -96,6 +96,27 @@
     };
   }
 
+  /* 全产品共用的 AI 配置（单例，不挂在课程命名空间下，避免被 listCourses 当成课程）
+   * - 仅存浏览器本地，绝不上传、绝不进入导出/分享包
+   * - apiKey 在写入时即脱敏，导出/分享包永远拿不到 */
+  var GLOBAL_AI_KEY = 'al_v2_glb_ai';
+  function getGlobalAIConfig() {
+    try {
+      var v = localStorage.getItem(GLOBAL_AI_KEY);
+      if (!v) return null;
+      var c = JSON.parse(v);
+      return Object.assign(defaultAiConfig(), c); // 合并默认，缺字段自动补
+    } catch (e) { return null; }
+  }
+  function setGlobalAIConfig(cfg) {
+    if (!cfg) { localStorage.removeItem(GLOBAL_AI_KEY); return; }
+    localStorage.setItem(GLOBAL_AI_KEY, JSON.stringify(Object.assign(defaultAiConfig(), cfg)));
+  }
+  function hasGlobalAI() {
+    var c = getGlobalAIConfig();
+    return !!(c && c.apiKey && c.apiKey.trim());
+  }
+
   /* 新建空白课程 —— 场景直接挂行为与指标/方法 */
   function createBlank(o) {
     o = o || {};
@@ -433,6 +454,9 @@
     migrate: migrate,
     defaultRhythm: defaultRhythm,
     defaultAiConfig: defaultAiConfig,
+    getAIConfig: getGlobalAIConfig,
+    setAIConfig: setGlobalAIConfig,
+    hasAI: hasGlobalAI,
     flatBehaviors: flatBehaviors,
     schedulePlan: schedulePlan,
     completion: completion,

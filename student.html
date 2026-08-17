@@ -281,7 +281,7 @@
     .confetti{display:none !important}
   }
 </style>
-<link rel="stylesheet" href="theme-warm.css?v=12">
+<link rel="stylesheet" href="theme-warm.css?v=14">
 </head>
 <body>
 <div class="phone">
@@ -292,6 +292,9 @@
         <div class="who"><span id="who-name">学员</span><span class="role" id="who-role"></span></div>
       </div>
       <div class="bell" id="bell" aria-hidden="true"></div>
+      <button id="ai-settings-btn-m" class="ai-mini" onclick="ALV2.aiSettings.open()" aria-label="AI 设置">
+        <span class="dot"></span><span class="t">AI</span>
+      </button>
     </div>
   </div>
 
@@ -366,10 +369,11 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=13"></script>
-<script src="sample-data.js?v=13"></script>
-<script src="icons.js?v=13"></script>
-<script src="ai.js?v=13"></script>
+<script src="v2-core.js?v=14"></script>
+<script src="sample-data.js?v=14"></script>
+<script src="icons.js?v=14"></script>
+<script src="ai.js?v=14"></script>
+<script src="ai-settings.js?v=14"></script>
 <script>
 (function(){
   'use strict';
@@ -504,6 +508,7 @@
     bindMap();
     switchScreen('today');
     maybeOnboard();
+    if (ALV2.aiSettings) ALV2.aiSettings.refresh();
   }
 
   function renderNoAccess(){
@@ -765,7 +770,7 @@
     buildSchedule(); renderToday();
     showCelebrate(b, sub);
     // AI 内容感知反馈（有 Key 时走真 LLM，否则用规则 mock）
-    var aiCfg = course.aiConfig;
+    var aiCfg = ALV2.getAIConfig();
     if(aiCfg && aiCfg.apiKey){
       var ctx={kind:b.kind, scene:scene, challenge:challenge, action:action, edited:sub.edited,
                resultImpact:resultImpact, difficulty:sub.difficulty, futureApplication:sub.futureApplication,
@@ -785,7 +790,7 @@
     $('cele-illus').innerHTML=illo('done');
     $('cele-title').textContent=title;$('cele-text').textContent=text;
     $('cele-coach').innerHTML='<span class="lbl">'+AL.icon('ai',{size:14})+'AI 陪练 · 给你的反馈</span>'+esc(coachText(b,sub,aiObj));
-    if(aiObj || !course.aiConfig || !course.aiConfig.apiKey) burstConfetti();
+    if(aiObj || !ALV2.hasAI()) burstConfetti();
     $('cele').classList.add('show');
     $('cele-ok').onclick=function(){$('cele').classList.remove('show');};
   }

@@ -148,3 +148,70 @@ body{
     radial-gradient(1200px 620px at 100% -12%, #3A2A22, transparent 58%),
     radial-gradient(940px 540px at -10% 8%, #2E2823, transparent 55%);
 }
+
+/* ====================== 全局 AI 设置入口 ====================== */
+/* 侧边栏常驻按钮 */
+.side-ai{
+  display:flex;align-items:center;gap:9px;width:100%;
+  margin:0 0 12px;padding:11px 14px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-full);
+  color:var(--ink);font-size:13.5px;font-weight:600;
+  box-shadow:0 4px 14px rgba(60,30,15,.06);transition:transform .16s var(--ease-spring),border-color .15s,background .15s;
+}
+.side-ai:hover{transform:translateY(-1px);border-color:var(--primary);background:#fff}
+.side-ai .dot{width:9px;height:9px;border-radius:50%;background:var(--ink-3);flex:0 0 auto;box-shadow:0 0 0 3px rgba(120,120,120,.14)}
+.side-ai .dot.on{background:var(--success);box-shadow:0 0 0 3px rgba(46,160,110,.18)}
+
+/* 首页 HERO 横幅 */
+.ai-hero{
+  display:flex;align-items:center;gap:20px;margin:0 0 26px;padding:22px 24px;
+  background:linear-gradient(120deg,#FFF7F1 0%,#FFEFE6 55%,#FBE9E1 100%);
+  border:1px solid #F3D9CC;border-radius:var(--r);box-shadow:0 10px 30px rgba(255,122,77,.10);
+  position:relative;overflow:hidden;
+}
+.ai-hero::after{content:'';position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,rgba(255,122,77,.18),transparent 70%);}
+.ai-hero-ic{flex:0 0 auto;width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--primary),#FF9A6E);color:#fff;box-shadow:0 8px 20px rgba(255,122,77,.32)}
+.ai-hero-ic svg{width:30px;height:30px}
+.ai-hero-body{flex:1;min-width:0}
+.ai-hero-kicker{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--primary);margin-bottom:4px}
+.ai-hero-body h2{margin:0 0 6px;font-size:19px;font-weight:800;color:var(--ink)}
+.ai-hero-body p{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:var(--ink-2)}
+.ai-hero-status{flex:0 0 auto;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;
+  padding:9px 14px;border-radius:var(--r-full);white-space:nowrap}
+.ai-hero-status .dot{width:9px;height:9px;border-radius:50%;background:var(--ink-3);flex:0 0 auto}
+.ai-hero-status.on{background:rgba(46,160,110,.12);color:#1f7a52}
+.ai-hero-status.on .dot{background:var(--success)}
+.ai-hero-status.off{background:rgba(255,122,77,.12);color:#c9542c)
+
+/* 学员端顶栏迷你按钮 */
+.ai-mini{display:flex;align-items:center;gap:6px;cursor:pointer;
+  padding:7px 12px;border-radius:var(--r-full);border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);font-size:12.5px;font-weight:700;flex:0 0 auto}
+.ai-mini .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.ai-mini .dot.on{background:var(--success)}
+
+/* ====================== AI 设置弹窗 ====================== */
+.ai-set-overlay{z-index:200}
+.ai-set-modal{width:600px}
+.ai-prov-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.ai-prov{display:flex;align-items:center;gap:9px;cursor:pointer;
+  padding:12px 13px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);
+  font-size:13.5px;font-weight:700;color:var(--ink);transition:transform .14s var(--ease-spring),border-color .15s,box-shadow .15s}
+.ai-prov:hover{transform:translateY(-2px);border-color:var(--pc,var(--primary))}
+.ai-prov .dot{width:10px;height:10px;border-radius:50%;background:var(--pc,var(--primary));flex:0 0 auto}
+.ai-prov.on{border-color:var(--pc,var(--primary));background:color-mix(in srgb,var(--pc,var(--primary)) 8%,#fff);
+  box-shadow:0 8px 18px color-mix(in srgb,var(--pc,var(--primary)) 22%,transparent)}
+.ai-set-sub{font-size:13px;line-height:1.6;color:var(--ink-2);margin:0 0 16px}
+.ai-set-row{margin-bottom:14px}
+.ai-adv{margin-top:6px;font-size:13px;color:var(--ink-2)}
+.ai-adv summary{cursor:pointer;font-weight:600;color:var(--primary);padding:6px 0}
+.ai-adv .field{margin-top:10px}
+.ai-set-test{font-size:12.5px;font-weight:600;min-height:18px;margin-top:12px}
+.ai-set-test.ok{color:#1f7a52}
+.ai-set-test.err{color:#c9542c}
+.ai-set-status{flex:1;font-size:12.5px;color:var(--ink-3)}
+
+/* 通用小标签（弹窗内裸用） */
+.ey{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);background:var(--primary-50,rgba(255,122,77,.12));padding:5px 12px;border-radius:999px;display:inline-block}

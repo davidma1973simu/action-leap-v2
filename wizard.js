@@ -497,36 +497,16 @@
     else if (x.type === 'chain') { state.draft.evidenceChain = { spentWhat: '', changedWhat: '', producedWhat: '', earnedWhat: '', links: ['', '', ''], expectedEvidence: ['', '', '', ''], _draft: false }; }
   }
 
-  /* ---------- AI 设置弹窗 ---------- */
+  /* ---------- AI 设置弹窗（委托给全局，全产品共用）---------- */
   function openAiSettings() {
-    var a = state.draft.aiConfig || ALV2.defaultAiConfig();
-    var box = el('wz-ai');
-    box.innerHTML = '<div class="wz-ai-modal">' +
-      '<div class="wz-ai-head"><b>AI 设置</b><button class="wz-x" id="wz-ai-x">✕</button></div>' +
-      '<p class="wz-ai-note">Key 只存在本机浏览器，绝不外传、不进导出包。没有 Key 时，AI 起草按钮不可用。</p>' +
-      '<div class="field"><label>接口地址</label><input class="in" id="wz-ai-url" value="' + esc(a.baseURL) + '" placeholder="https://api.openai.com/v1" /></div>' +
-      '<div class="field"><label>模型</label><input class="in" id="wz-ai-model" value="' + esc(a.model) + '" placeholder="gpt-4o-mini" /></div>' +
-      '<div class="field"><label>API Key</label><input class="in" id="wz-ai-key" type="password" value="' + esc(a.apiKey) + '" placeholder="sk-..." /></div>' +
-      '<div class="wz-ai-foot"><button class="btn btn-primary btn-sm" id="wz-ai-save">保存</button></div>' +
-      '</div>';
-    box.classList.add('show');
-    el('wz-ai-x').onclick = function () { box.classList.remove('show'); box.innerHTML = ''; };
-    el('wz-ai-save').onclick = function () {
-      state.draft.aiConfig = {
-        provider: 'openai-compatible',
-        baseURL: el('wz-ai-url').value.trim() || 'https://api.openai.com/v1',
-        model: el('wz-ai-model').value.trim() || 'gpt-4o-mini',
-        apiKey: el('wz-ai-key').value.trim()
-      };
-      box.classList.remove('show'); box.innerHTML = '';
-      toast('AI 设置已保存（仅本机）', 'ok');
-    };
+    if (typeof window.openAISettings === 'function') { window.openAISettings(); return; }
+    toast('AI 设置模块未加载', 'err');
   }
 
   /* ---------- AI 起草弹窗 ---------- */
   function openDraftGen() {
-    var a = state.draft.aiConfig || {};
-    if (!a.apiKey) { toast('请先在「AI 设置」里填写 Key', 'err'); openAiSettings(); return; }
+    var a = ALV2.getAIConfig();
+    if (!a || !a.apiKey) { toast('请先在「AI 设置」里填写 Key（点顶部 AI 设置）', 'err'); openAiSettings(); return; }
     var box = el('wz-ai');
     box.innerHTML = '<div class="wz-ai-modal">' +
       '<div class="wz-ai-head"><b>AI 起草 · 关键场景</b><button class="wz-x" id="wz-dg-x">✕</button></div>' +
@@ -553,7 +533,7 @@
       var run = function () {
         st.textContent = '正在生成…（约 10–30 秒）';
         el('wz-dg-go').disabled = true;
-        ai.generateConfigDraft(input, state.draft.aiConfig).then(function (mapped) {
+        ai.generateConfigDraft(input, ALV2.getAIConfig()).then(function (mapped) {
           (mapped.scenarios || []).forEach(function (sc) { state.draft.scenarios.push(sc); });
           if (mapped.evidenceChain) state.draft.evidenceChain = mapped.evidenceChain;
           if (!state.draft.theme && input.theme) state.draft.theme = input.theme;
@@ -601,7 +581,6 @@
       startOffsetDays: d.rhythm.startOffsetDays != null ? d.rhythm.startOffsetDays : 1,
       skipWeekend: d.rhythm.skipWeekend !== false
     };
-    cfg.aiConfig = d.aiConfig;
     ALV2.store.set(cfg.sku, 'config', cfg);
     close();
     state.onDone(cfg.sku);

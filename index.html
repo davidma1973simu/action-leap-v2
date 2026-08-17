@@ -868,7 +868,7 @@
   .wz-ms-row .in{ flex:1; }
   .wz-muted{ font-size:12px; color:var(--ink-3); }
 </style>
-<link rel="stylesheet" href="theme-warm.css?v=12">
+<link rel="stylesheet" href="theme-warm.css?v=14">
 </head>
 <body>
 <div class="app">
@@ -906,6 +906,9 @@
         成果汇报
       </div>
     </nav>
+    <button id="ai-settings-btn" class="side-ai" onclick="ALV2.aiSettings.open()">
+      <span class="dot"></span><span class="t">AI 设置</span>
+    </button>
     <div class="side-foot">体验版 · 数据保存在本机浏览器<span class="pill">MVP</span></div>
   </aside>
 
@@ -919,6 +922,23 @@
             <h1>如何使用 Action Leap</h1>
             <p>四步看懂产品怎么转：配置者怎么填、学员怎么用、HR 怎么拿到成果。新手先看这一页，再进配置构建器。</p>
           </div>
+        </div>
+
+        <!-- AI 能力 HERO 横幅 -->
+        <div class="ai-hero" id="ai-hero">
+          <div class="ai-hero-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4.2"/>
+              <path d="M12 8.4v7.2M8.4 12h7.2"/>
+            </svg>
+          </div>
+          <div class="ai-hero-body">
+            <div class="ai-hero-kicker">AI 能力 · 全产品共用</div>
+            <h2>开启 AI，让配置与汇报都更省力</h2>
+            <p>选一个主流大模型、填一次 Key，配置起草 / 学员陪练 / 复盘建议 / 高层简报 都能用——一次配置，全站共享。</p>
+            <button class="btn btn-primary btn-sm" onclick="ALV2.aiSettings.open()">配置 AI</button>
+          </div>
+          <div class="ai-hero-status" id="ai-hero-status"></div>
         </div>
 
         <!-- 全链路运转 -->
@@ -1270,12 +1290,13 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=13"></script>
-<script src="sample-data.js?v=13"></script>
-<script src="icons.js?v=13"></script>
-<script src="ai.js?v=13"></script>
-<script src="report.js?v=13"></script>
-<script src="wizard.js?v=13"></script>
+<script src="v2-core.js?v=14"></script>
+<script src="sample-data.js?v=14"></script>
+<script src="icons.js?v=14"></script>
+<script src="ai.js?v=14"></script>
+<script src="ai-settings.js?v=14"></script>
+<script src="report.js?v=14"></script>
+<script src="wizard.js?v=14"></script>
 <script>
   // =====================================================================
   //  公共工具
@@ -3207,8 +3228,8 @@
     var microSubmissions = subs.filter(function (s) { var o = fbMap[s.behaviorId]; return !o || o.kind !== 'key'; });
     var metricLabel = (course.scenarios && course.scenarios[0] && course.scenarios[0].metric && (course.scenarios[0].metric.label || course.scenarios[0].metric.name)) || '';
     var reviewCtx = { keyBehaviors: keyBehaviors, microSubmissions: microSubmissions, metricLabel: metricLabel };
-    var aiConfig = (course.aiConfig && course.aiConfig.apiKey) ? course.aiConfig : null;
-    if (!aiConfig) { toast('尚未配置 AI Key（设置 → AI 起草），无法生成建议', 'warn'); return; }
+    var aiConfig = ALV2.getAIConfig();
+    if (!aiConfig || !aiConfig.apiKey) { toast('尚未配置 AI。点左上角「AI 设置」选模型并填入 Key 后可生成建议', 'warn'); return; }
     toast('AI 正在分析 ' + name + ' 的迁移记录…', 'ok');
     ALV2.ai.reviewAssist(reviewCtx, aiConfig).then(function (res) {
       (res.keyFeedback || []).forEach(function (kf) {
@@ -3226,6 +3247,7 @@
   }
   // 初始化（自动注入不可删示范样例，再渲染课程列表）
   autoSeedSample();
+  if (ALV2.aiSettings) ALV2.aiSettings.refresh();
 </script>
 <div id="wizard" class="wizard-overlay hidden"></div>
 <div id="wz-ai" class="wz-ai"></div>

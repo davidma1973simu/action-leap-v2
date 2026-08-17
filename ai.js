@@ -10,6 +10,27 @@
   var ALV2 = global.ALV2 || (global.ALV2 = {});
   ALV2.ai = {};
 
+  /* 主流大模型预设（均兼容 OpenAI /chat/completions 协议）
+   * 设置弹窗里只选这几个 + 填 Key，全产品共用。 */
+  var PROVIDERS = [
+    { id: 'openai', name: 'OpenAI', color: '#10a37f', baseURL: 'https://api.openai.com/v1',
+      models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1', 'o4-mini'] },
+    { id: 'deepseek', name: 'DeepSeek', color: '#4d6bfe', baseURL: 'https://api.deepseek.com/v1',
+      models: ['deepseek-chat', 'deepseek-reasoner'] },
+    { id: 'qwen', name: '通义千问', color: '#615ced', baseURL: 'https://dashscope.aliyun.com/compatible-mode/v1',
+      models: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'] },
+    { id: 'glm', name: '智谱 GLM', color: '#3a7afe', baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+      models: ['glm-4-plus', 'glm-4-air', 'glm-4-flash'] },
+    { id: 'kimi', name: 'Kimi', color: '#3b5bff', baseURL: 'https://api.moonshot.cn/v1',
+      models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'] },
+    { id: 'doubao', name: '豆包', color: '#2f6bff', baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+      models: ['doubao-seed-1.6-250615', 'doubao-pro-32k', 'doubao-lite-32k'] }
+  ];
+  function providerById(id) {
+    for (var i = 0; i < PROVIDERS.length; i++) if (PROVIDERS[i].id === id) return PROVIDERS[i];
+    return null;
+  }
+
   /* 调用 OpenAI 兼容对话接口，返回 assistant 文本 */
   function callChat(aiConfig, messages, opts) {
     opts = opts || {};
@@ -294,6 +315,8 @@
     reviewAssist: reviewAssist,
     reportDraft: reportDraft,
     mapDraft: mapDraft,
+    PROVIDERS: PROVIDERS,
+    providerById: providerById,
     _SYSTEM_DRAFT: SYSTEM_DRAFT,
     _SYSTEM_FEEDBACK: SYSTEM_FEEDBACK,
     _SYSTEM_REVIEW: SYSTEM_REVIEW,
