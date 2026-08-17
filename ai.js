@@ -217,14 +217,86 @@
     });
   }
 
+  /* ---------- 高层简报（HR/CEO 用） ---------- */
+  var SYSTEM_REPORT =
+    '你是企业培训的"高层汇报写作专家"，要给 CEO/CHRO 看的一份 1–2 页 A4 高层简报。\n' +
+    '风格要求：句子短、动词强、数据驱动；不要任何空话套话；不出现"赋能/抓手/闭环"等行业陈词；不出现技术术语。\n' +
+    '你只能根据【下面的真实数据】写，绝不编造数字。数据缺失时，直接写"待补录"。\n' +
+    '严格返回 JSON，不要任何解释文字：\n' +
+    '{\n' +
+    '  "executiveSummary":"执行摘要：100–160 字。一段话。对这门课"投入了什么—改变了什么—产出了什么—创造了什么价值"做总结，引用关键数字（如训前基线→训后值、改善幅度、参与率）。",\n' +
+    '  "topFindings": ["结论1（30–60字，引用具体学员证据或数字）","结论2","结论3"],\n' +
+    '  "risk":"风险提示（30–80字，指出执行/持续/组织/测量上的一个最关键风险 + 一句对策建议；如果数据不足，可空字符串）",\n' +
+    '  "assetRecommendation":"组织资产沉淀建议（40–120字：一句话告诉组织，这门课沉淀的方法/标准/案例可以沉淀成什么、可被复用在哪）",\n' +
+    '  "highlights":[{"tag":"亮点/方法/数据/案例","text":"一句话，可选 2–4 条"}]\n' +
+    '}\n' +
+    '约束：所有结论必须可在下方数据中找到依据；避免"非常/显著/极大"等无依据量词；用"3/5 名学员""较训前 +X 分"这类精确表达。';
+
+  /* reportCtx：{course, students, totalBehaviors, completion, metricTrends, evidenceChain}
+   * metricTrends: [{scenarioName, unit, baseline, current, delta, deltaPct, hasData}]
+   */
+  function reportDraft(reportCtx, aiConfig) {
+    reportCtx = reportCtx || {};
+    var c = reportCtx.course || {};
+    var stus = reportCtx.students || [];
+    var totalSubs = reportCtx.totalSubs || 0;
+    var comp = reportCtx.completion || { done: 0, total: 0 };
+    var trends = reportCtx.metricTrends || [];
+    var ec = reportCtx.evidenceChain || {};
+
+    var trendText = trends.map(function (t) {
+      if (!t.hasData) return '【' + t.scenarioName + ' 指标】待补录';
+      return '【' + t.scenarioName + ' 指标】' + t.label + '：训前基线 ' + t.baseline +
+        (t.unit ? ' ' + t.unit : '') + '，当前 ' + t.current +
+        (t.unit ? ' ' + t.unit : '') + '，改善 ' + (t.delta > 0 ? '+' : '') + t.delta +
+        (t.unit ? ' ' + t.unit : '') + '（' + (t.deltaPct > 0 ? '+' : '') + t.deltaPct + '%）';
+    }).join('\n');
+
+    var user =
+      '【课程】' + (c.theme || '（未命名）') +
+      ' · 客户：' + (c.client || '（未填）') +
+      ' · 班次：' + (c.cohort || '（未填）') + '\n' +
+      '【规模】参与学员：' + stus.length + ' 名；提交打卡：' + totalSubs + ' 次；高绩效行为完成：' +
+      comp.done + ' / ' + comp.total + '\n\n' +
+      '【证据链】投入：' + (ec.spentWhat || '（未填）') + '\n改变：' + (ec.changedWhat || '（未填）') +
+      '\n产出：' + (ec.producedWhat || '（未填）') + '\n贡献：' + (ec.earnedWhat || '（未填）') + '\n\n' +
+      '【指标趋势（每个场景）】\n' + (trendText || '（无）') + '\n\n' +
+      '【关键行为复盘摘要（前 3 条，逐条一行）】' +
+      (reportCtx.keyBehaviorRecap || '（无）') + '\n\n' +
+      '【学员具体场景案例（前 3 条最具体的，仅用结构和短语、不要长引述）】' +
+      (reportCtx.behaviorSamples || '（无）');
+
+    return callChat(aiConfig,
+      [{ role: 'system', content: SYSTEM_REPORT }, { role: 'user', content: user }],
+      { json: true, temperature: 0.4 }
+    ).then(function (txt) {
+      var parsed;
+      try {
+        var m = txt.match(/\{[\s\S]*\}/);
+        parsed = JSON.parse(m ? m[0] : txt);
+      } catch (e) {
+        throw new Error('AI 简报返回无法解析：' + e.message);
+      }
+      return {
+        executiveSummary: parsed.executiveSummary || '',
+        topFindings: Array.isArray(parsed.topFindings) ? parsed.topFindings.slice(0, 3) : [],
+        risk: parsed.risk || '',
+        assetRecommendation: parsed.assetRecommendation || '',
+        highlights: Array.isArray(parsed.highlights) ? parsed.highlights.slice(0, 4) : []
+      };
+    });
+  }
+
   ALV2.ai = {
     callChat: callChat,
     generateConfigDraft: generateConfigDraft,
     studentFeedback: studentFeedback,
     reviewAssist: reviewAssist,
+    reportDraft: reportDraft,
     mapDraft: mapDraft,
     _SYSTEM_DRAFT: SYSTEM_DRAFT,
     _SYSTEM_FEEDBACK: SYSTEM_FEEDBACK,
-    _SYSTEM_REVIEW: SYSTEM_REVIEW
+    _SYSTEM_REVIEW: SYSTEM_REVIEW,
+    _SYSTEM_REPORT: SYSTEM_REPORT
   };
 })(window);

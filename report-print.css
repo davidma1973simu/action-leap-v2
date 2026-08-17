@@ -1,0 +1,286 @@
+/* ============================================================
+ * Action Leap V2 · 高层简报打印样式（report-print.css）
+ * 设计目标：A4 单页 / 两页，CEO 看的"一封信"质感
+ *   - 字号紧凑、字重强、字距稳；中文优先 PingFang SC / Noto Sans CJK
+ *   - 强结构 → 标题数字 / eyebrow / 段落递进清晰
+ *   - 颜色极简：黑字 + 单一暖橙强调
+ *   - 屏幕下完全隐藏（只在 window.open 的打印窗口出现）
+ * ============================================================ */
+@page {
+  size: A4;
+  margin: 14mm 16mm 16mm;
+}
+@page :first {
+  margin-top: 14mm;
+}
+
+.rep-print-body {
+  margin: 0;
+  background: #fff;
+  color: #1F2937;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+/* 一页严格控制高度：A4 可用 ~257mm - 14mm - 16mm = 227mm */
+.rep-page {
+  box-sizing: border-box;
+  width: 100%;
+  height: 245mm;       /* A4 安全可印区 */
+  page-break-after: always;
+  display: flex;
+  flex-direction: column;
+  gap: 7mm;
+  padding-top: 2mm;
+}
+.rep-page:last-child {
+  page-break-after: auto;
+}
+
+/* ===== Page header ===== */
+.rep-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 2.5pt solid #FF7A4D;
+  padding-bottom: 4mm;
+}
+.rep-head-simple {
+  border-bottom: 1.5pt solid #FF7A4D;
+  padding-bottom: 3mm;
+  margin-bottom: 2mm;
+}
+.rep-brand {
+  font-size: 9pt;
+  letter-spacing: .12em;
+  color: #FF7A4D;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.rep-meta {
+  text-align: right;
+}
+.rep-title {
+  font-size: 17pt;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  margin: 1mm 0 0;
+  color: #1F2937;
+}
+.rep-title-sm {
+  font-size: 11pt;
+  font-weight: 700;
+  margin-top: 1mm;
+  color: #1F2937;
+}
+.rep-sub {
+  font-size: 9pt;
+  color: #6B7280;
+  margin-top: 1mm;
+}
+
+/* ===== Eyebrow ===== */
+.rep-eyebrow {
+  font-size: 8pt;
+  letter-spacing: .18em;
+  font-weight: 700;
+  color: #FF7A4D;
+  text-transform: uppercase;
+  margin-bottom: 1.5mm;
+}
+.rep-eyebrow.warn { color: #C2410C; }
+
+/* ===== Executive summary ===== */
+.rep-summary {
+  flex: 0 0 auto;
+}
+.rep-lead {
+  font-size: 12pt;
+  line-height: 1.6;
+  font-weight: 500;
+  color: #111827;
+  margin: 1mm 0 0;
+  background: linear-gradient(180deg, transparent 0, rgba(255,122,77,.04) 0);
+  border-left: 3pt solid #FF7A4D;
+  padding: 3mm 5mm 3mm 6mm;
+  border-radius: 1mm;
+}
+
+/* ===== KPIs ===== */
+.rep-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4mm;
+}
+.rep-kpi {
+  background: #FFFBF7;
+  border: 0.6pt solid #FFE0CC;
+  border-radius: 2mm;
+  padding: 5mm 4mm;
+  text-align: center;
+}
+.rep-kpi .n {
+  font-size: 22pt;
+  font-weight: 800;
+  color: #FF7A4D;
+  letter-spacing: -.02em;
+  line-height: 1;
+}
+.rep-kpi .l {
+  font-size: 9pt;
+  color: #6B7280;
+  margin-top: 1.5mm;
+  font-weight: 500;
+}
+
+/* ===== Trend chart ===== */
+.rep-chart {
+  border: 0.6pt solid #FFE0CC;
+  border-radius: 2mm;
+  padding: 4mm 5mm 3mm;
+  background: #FFFDF8;
+}
+.rep-chart-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1mm;
+}
+.rep-chart-title {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #1F2937;
+  margin-top: 1mm;
+}
+.rep-chart-delta {
+  font-size: 10pt;
+  font-weight: 700;
+  color: #FF7A4D;
+  background: rgba(255,122,77,.10);
+  padding: 1mm 3mm;
+  border-radius: 99pt;
+}
+.rep-chart svg {
+  display: block;
+  margin-top: 2mm;
+}
+.rep-empty .rep-muted {
+  font-size: 9pt;
+  color: #9CA3AF;
+  margin-top: 1mm;
+}
+.rep-muted { color: #9CA3AF; font-size: 9pt; }
+
+/* ===== Findings ===== */
+.rep-findings, .rep-block {
+  margin-bottom: 4mm;
+}
+.rep-list {
+  list-style: none;
+  padding: 0;
+  margin: 2mm 0 0;
+  counter-reset: none;
+}
+.rep-list li {
+  display: flex;
+  gap: 4mm;
+  align-items: flex-start;
+  padding: 2.5mm 0;
+  border-bottom: 0.4pt dashed #E5DED4;
+  font-size: 10pt;
+  line-height: 1.55;
+  color: #1F2937;
+}
+.rep-list li:last-child { border-bottom: none; }
+.rep-num {
+  flex: 0 0 8mm;
+  height: 8mm;
+  border-radius: 50%;
+  background: #FF7A4D;
+  color: #fff;
+  font-weight: 800;
+  font-size: 11pt;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rep-text {
+  font-size: 10pt;
+  line-height: 1.55;
+  color: #374151;
+  margin-top: 1.5mm;
+}
+
+/* ===== Risk + Asset 2-column ===== */
+.rep-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5mm;
+}
+.rep-grid-2 .rep-block {
+  background: #FFFBF7;
+  border-left: 3pt solid #FF7A4D;
+  border-radius: 1.5mm;
+  padding: 3.5mm 5mm;
+}
+
+.rep-grid-2 .rep-block:has(.rep-eyebrow.warn) {
+  border-left-color: #C2410C;
+  background: #FFF7F4;
+}
+
+/* ===== Appendix table ===== */
+.rep-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 2mm;
+  font-size: 9.5pt;
+}
+.rep-table th {
+  background: #FFF1E8;
+  color: #FF7A4D;
+  text-align: left;
+  font-weight: 700;
+  padding: 2mm 3mm;
+  border-bottom: 1pt solid #FF7A4D;
+}
+.rep-table td {
+  padding: 2.5mm 3mm;
+  border-bottom: 0.4pt dashed #E5DED4;
+  color: #1F2937;
+}
+.rep-delta.up { color: #C2410C; font-weight: 700; }
+.rep-delta.down { color: #047857; font-weight: 700; }
+
+/* ===== Footer ===== */
+.rep-foot {
+  margin-top: auto;
+  border-top: 0.4pt dashed #E5DED4;
+  padding-top: 2mm;
+  font-size: 8pt;
+  color: #9CA3AF;
+  text-align: center;
+}
+
+/* ===== Screen: 完全隐藏（只在 window.open 打印窗口出现） ===== */
+@media screen {
+  body:not(.rep-print-body) .rep-page { display: none !important; }
+  .rep-print-body .rep-page { display: flex !important; }
+}
+
+/* ===== Print tweaks ===== */
+@media print {
+  .rep-print-body { background: #fff; }
+  .rep-page { height: 245mm; }
+  /* 强制分页：第二页肯定要 break */
+  .rep-page + .rep-page { page-break-before: always; }
+  /* 链接去掉 */
+  a { color: inherit; text-decoration: none; }
+  /* 节省墨水：背景淡化（白纸背景的版本保留极浅暖色） */
+  .rep-kpi, .rep-chart, .rep-grid-2 .rep-block { background: #FFFDFB; }
+}

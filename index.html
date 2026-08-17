@@ -1270,11 +1270,12 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="v2-core.js?v=11"></script>
-<script src="sample-data.js?v=11"></script>
-<script src="icons.js?v=11"></script>
-<script src="ai.js?v=11"></script>
-<script src="wizard.js?v=11"></script>
+<script src="v2-core.js?v=13"></script>
+<script src="sample-data.js?v=13"></script>
+<script src="icons.js?v=13"></script>
+<script src="ai.js?v=13"></script>
+<script src="report.js?v=13"></script>
+<script src="wizard.js?v=13"></script>
 <script>
   // =====================================================================
   //  公共工具
@@ -2693,7 +2694,8 @@
         '<span>提交：<b>' + allSubs.length + '</b> 次</span></div></div>' +
         '<div class="rp-actions">' +
         '<button class="btn btn-ghost btn-sm" id="rp-copy">' + AL.icon('copy',{size:16,cls:'al-ic'}) + ' 复制文字版</button>' +
-        '<button class="btn btn-primary btn-sm" id="rp-export">' + AL.icon('export',{size:16,cls:'al-ic'}) + ' 导出汇报件</button>' +
+        '<button class="btn btn-primary btn-sm" id="rp-report" title="调 AI 一键生成 1–2 页 A4 高层简报，自动弹出打印窗口">' + AL.icon('ai',{size:16,cls:'al-ic'}) + ' 生成 AI 高层简报</button>' +
+        '<button class="btn btn-ghost btn-sm" id="rp-export" title="原 HTML 兜底（打印整个页面）">' + AL.icon('export',{size:16,cls:'al-ic'}) + ' HTML 兜底</button>' +
         '</div></div>';
 
       var sec1 = RP.secHead('1', '框架 · 课程设计闭环', '') + RP.renderFramework(course) + '</div>';
@@ -2713,6 +2715,23 @@
 
       v.innerHTML = head + sec1 + sec2 + sec3 + sec4;
 
+      document.getElementById('rp-report').onclick = function () {
+        var btn = this;
+        var oldHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = AL.icon('ai',{size:16,cls:'al-ic'}) + ' AI 生成中…';
+        ALV2.report.generate(course.sku).then(function () {
+          toast('已生成 · 浏览器打印窗口已弹出（可另存为 PDF）', 'ok');
+          btn.disabled = false; btn.innerHTML = oldHTML;
+        }).catch(function (err) {
+          btn.disabled = false; btn.innerHTML = oldHTML;
+          if (err && err.code === 'NO_KEY') {
+            toast(err.message + '（点配置构建器 → AI 设置 可填入 Key）', 'err', 4500);
+          } else {
+            toast((err && err.message) || 'AI 生成失败', 'err');
+          }
+        });
+      };
       document.getElementById('rp-export').onclick = function () { RP.exportHTML(course, students, allSubs, reviews, synth); };
       document.getElementById('rp-copy').onclick = function () { RP.copyText(course, students, allSubs, reviews, synth); };
       // 指标跟踪录入交互（HR 持续录入各期数值）
