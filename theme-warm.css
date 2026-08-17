@@ -183,7 +183,7 @@ body{
 .ai-hero-status .dot{width:9px;height:9px;border-radius:50%;background:var(--ink-3);flex:0 0 auto}
 .ai-hero-status.on{background:rgba(46,160,110,.12);color:#1f7a52}
 .ai-hero-status.on .dot{background:var(--success)}
-.ai-hero-status.off{background:rgba(255,122,77,.12);color:#c9542c)
+.ai-hero-status.off{background:rgba(255,122,77,.12);color:#c9542c}
 
 /* 学员端顶栏迷你按钮 */
 .ai-mini{display:flex;align-items:center;gap:6px;cursor:pointer;
